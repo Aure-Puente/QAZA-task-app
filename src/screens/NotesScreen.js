@@ -38,6 +38,31 @@ export default function NotesScreen({ navigation }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
+  const isDarkMode = !!theme.dark;
+  const custom = theme.custom || {};
+
+  const palette = useMemo(
+    () => ({
+      background: theme.colors.background,
+      surface: theme.colors.surface,
+      primary: theme.colors.primary,
+      text: theme.colors.onBackground,
+      textSecondary: custom.textSecondary || theme.colors.onSurfaceVariant,
+      textMuted: custom.textMuted || theme.colors.onSurfaceVariant,
+      border: custom.border || theme.colors.outline,
+      softBg: custom.softBg || theme.colors.surfaceVariant,
+      card: custom.card || theme.colors.surface,
+      danger: custom.danger || theme.colors.error,
+      shadow: custom.shadow || "#000000",
+    }),
+    [theme, custom]
+  );
+
+  const styles = useMemo(
+    () => createStyles(palette, isDarkMode),
+    [palette, isDarkMode]
+  );
+
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -119,7 +144,10 @@ export default function NotesScreen({ navigation }) {
   return (
     <>
       <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F4F8F1" />
+        <StatusBar
+          barStyle={isDarkMode ? "light-content" : "dark-content"}
+          backgroundColor={palette.background}
+        />
 
         <View style={styles.backgroundShapeTop} />
         <View style={styles.backgroundShapeBottom} />
@@ -147,7 +175,8 @@ export default function NotesScreen({ navigation }) {
             style={styles.createButton}
             contentStyle={styles.createButtonContent}
             labelStyle={styles.createButtonLabel}
-            buttonColor={theme.colors.primary}
+            buttonColor={palette.primary}
+            textColor="#FFFFFF"
             icon="plus"
           >
             Crear nota
@@ -161,7 +190,7 @@ export default function NotesScreen({ navigation }) {
               compact
               onPress={() => setActiveCategoryFilter(null)}
               disabled={!activeCategoryFilter}
-              textColor="#667085"
+              textColor={palette.textSecondary}
               style={[
                 styles.clearFilterButton,
                 !activeCategoryFilter && styles.clearFilterButtonHidden,
@@ -183,7 +212,11 @@ export default function NotesScreen({ navigation }) {
                   style={({ pressed }) => [
                     styles.categoryPreviewChip,
                     {
-                      backgroundColor: selected ? category.color : category.soft,
+                      backgroundColor: selected
+                        ? category.color
+                        : isDarkMode
+                        ? "rgba(255,255,255,0.025)"
+                        : category.soft,
                       borderColor: selected ? category.color : category.border,
                     },
                     pressed && styles.categoryPreviewChipPressed,
@@ -226,7 +259,7 @@ export default function NotesScreen({ navigation }) {
 
           {loading ? (
             <View style={styles.centered}>
-              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <ActivityIndicator size="large" color={palette.primary} />
               <Text style={styles.loadingText}>Cargando notas...</Text>
             </View>
           ) : filteredNotes.length === 0 ? (
@@ -236,7 +269,7 @@ export default function NotesScreen({ navigation }) {
                   <MaterialCommunityIcons
                     name="notebook-outline"
                     size={34}
-                    color={theme.colors.primary}
+                    color={palette.primary}
                   />
                 </View>
 
@@ -299,7 +332,7 @@ export default function NotesScreen({ navigation }) {
                               <MaterialCommunityIcons
                                 name="account-edit-outline"
                                 size={14}
-                                color="#667085"
+                                color={palette.textMuted}
                               />
 
                               <Text style={styles.noteMetaText} numberOfLines={1}>
@@ -316,8 +349,8 @@ export default function NotesScreen({ navigation }) {
                               icon="trash-can-outline"
                               size={20}
                               mode="outlined"
-                              containerColor="#FFFFFF"
-                              iconColor="#C62828"
+                              containerColor={isDarkMode ? "rgba(255,255,255,0.025)" : "#FFFFFF"}
+                              iconColor={palette.danger}
                               style={styles.deleteNoteButton}
                               onPress={() => handleAskDeleteNote(note)}
                             />
@@ -325,7 +358,7 @@ export default function NotesScreen({ navigation }) {
                             <MaterialCommunityIcons
                               name="chevron-right"
                               size={22}
-                              color="#98A2B3"
+                              color={palette.textMuted}
                             />
                           </View>
                         </View>
@@ -402,7 +435,7 @@ export default function NotesScreen({ navigation }) {
                 onPress={handleCloseDeleteDialog}
                 disabled={deleting}
                 style={styles.cancelDeleteButton}
-                textColor="#667085"
+                textColor={palette.textSecondary}
               >
                 Cancelar
               </Button>
@@ -413,7 +446,8 @@ export default function NotesScreen({ navigation }) {
                 loading={deleting}
                 disabled={deleting}
                 style={styles.confirmDeleteButton}
-                buttonColor="#C62828"
+                buttonColor={palette.danger}
+                textColor="#FFFFFF"
                 icon="trash-can-outline"
               >
                 Eliminar
@@ -426,338 +460,356 @@ export default function NotesScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#F4F8F1",
-  },
+function createStyles(palette, isDarkMode) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
 
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 16,
-  },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: 16,
+    },
 
-  backgroundShapeTop: {
-    position: "absolute",
-    top: -120,
-    right: -70,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: "rgba(78, 122, 40, 0.08)",
-  },
+    backgroundShapeTop: {
+      position: "absolute",
+      top: -120,
+      right: -70,
+      width: 240,
+      height: 240,
+      borderRadius: 120,
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.08)"
+        : "rgba(209, 107, 24, 0.06)",
+    },
 
-  backgroundShapeBottom: {
-    position: "absolute",
-    bottom: -100,
-    left: -60,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "rgba(78, 122, 40, 0.06)",
-  },
+    backgroundShapeBottom: {
+      position: "absolute",
+      bottom: -100,
+      left: -60,
+      width: 220,
+      height: 220,
+      borderRadius: 110,
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.055)"
+        : "rgba(209, 107, 24, 0.045)",
+    },
 
-  headerBlock: {
-    marginBottom: 16,
-  },
+    headerBlock: {
+      marginBottom: 16,
+    },
 
-  title: {
-    color: "#234015",
-    fontWeight: "800",
-    marginBottom: 8,
-  },
+    title: {
+      color: palette.text,
+      fontWeight: "800",
+      marginBottom: 8,
+    },
 
-  subtitle: {
-    color: "#5E6E57",
-    lineHeight: 21,
-    maxWidth: 340,
-  },
+    subtitle: {
+      color: palette.textSecondary,
+      lineHeight: 21,
+      maxWidth: 340,
+    },
 
-  createButton: {
-    borderRadius: 16,
-    marginBottom: 14,
-  },
+    createButton: {
+      borderRadius: 16,
+      marginBottom: 14,
+    },
 
-  createButtonContent: {
-    height: 50,
-  },
+    createButtonContent: {
+      height: 50,
+    },
 
-  createButtonLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
+    createButtonLabel: {
+      fontSize: 15,
+      fontWeight: "700",
+    },
 
-  categoriesHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 5,
-  },
+    categoriesHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 5,
+    },
 
-  categoriesTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#344054",
-  },
+    categoriesTitle: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: palette.text,
+    },
 
-  clearFilterButton: {
-    margin: 0,
-    width: 74,
-    alignItems: "flex-end",
-  },
+    clearFilterButton: {
+      margin: 0,
+      width: 74,
+      alignItems: "flex-end",
+    },
 
-  clearFilterButtonHidden: {
-    opacity: 0,
-  },
+    clearFilterButtonHidden: {
+      opacity: 0,
+    },
 
-  clearFilterLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
+    clearFilterLabel: {
+      fontSize: 12,
+      fontWeight: "700",
+    },
 
-  categoriesPreview: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 20,
-  },
+    categoriesPreview: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 20,
+    },
 
-  categoryPreviewChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
+    categoryPreviewChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      borderWidth: 1,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
 
-  categoryPreviewChipPressed: {
-    opacity: 0.85,
-  },
+    categoryPreviewChipPressed: {
+      opacity: 0.85,
+    },
 
-  categoryPreviewText: {
-    fontSize: 11.5,
-    fontWeight: "800",
-  },
+    categoryPreviewText: {
+      fontSize: 11.5,
+      fontWeight: "800",
+    },
 
-  sectionHeader: {
-    marginBottom: 12,
-  },
+    sectionHeader: {
+      marginBottom: 12,
+    },
 
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#234015",
-    marginBottom: 3,
-  },
+    sectionTitle: {
+      fontSize: 17,
+      fontWeight: "800",
+      color: palette.text,
+      marginBottom: 3,
+    },
 
-  sectionSubtitle: {
-    fontSize: 13,
-    color: "#667085",
-  },
+    sectionSubtitle: {
+      fontSize: 13,
+      color: palette.textSecondary,
+    },
 
-  centered: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 50,
-  },
+    centered: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 50,
+    },
 
-  loadingText: {
-    marginTop: 10,
-    color: "#667085",
-    fontWeight: "600",
-  },
+    loadingText: {
+      marginTop: 10,
+      color: palette.textSecondary,
+      fontWeight: "600",
+    },
 
-  emptyCard: {
-    borderRadius: 24,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    elevation: 2,
-  },
+    emptyCard: {
+      borderRadius: 24,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+      elevation: 2,
+      shadowColor: palette.shadow,
+      shadowOpacity: isDarkMode ? 0.18 : 0.06,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+    },
 
-  emptyContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 30,
-    alignItems: "center",
-  },
+    emptyContent: {
+      paddingHorizontal: 20,
+      paddingVertical: 30,
+      alignItems: "center",
+    },
 
-  emptyIconCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: "#F6F9F2",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
+    emptyIconCircle: {
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.11)"
+        : "rgba(209, 107, 24, 0.08)",
+      borderWidth: 1,
+      borderColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.22)"
+        : "rgba(209, 107, 24, 0.18)",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 16,
+    },
 
-  emptyTitle: {
-    fontWeight: "800",
-    color: "#1F2937",
-    textAlign: "center",
-    marginBottom: 8,
-  },
+    emptyTitle: {
+      fontWeight: "800",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: 8,
+    },
 
-  emptyText: {
-    color: "#667085",
-    textAlign: "center",
-    lineHeight: 21,
-  },
+    emptyText: {
+      color: palette.textSecondary,
+      textAlign: "center",
+      lineHeight: 21,
+    },
 
-  notesList: {
-    gap: 12,
-  },
+    notesList: {
+      gap: 12,
+    },
 
-  notePressable: {
-    borderRadius: 22,
-  },
+    notePressable: {
+      borderRadius: 22,
+    },
 
-  notePressablePressed: {
-    opacity: 0.9,
-  },
+    notePressablePressed: {
+      opacity: 0.9,
+    },
 
-  noteCard: {
-    borderRadius: 22,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    elevation: 2,
-  },
+    noteCard: {
+      borderRadius: 22,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+      elevation: 2,
+      shadowColor: palette.shadow,
+      shadowOpacity: isDarkMode ? 0.18 : 0.06,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+    },
 
-  noteContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
+    noteContent: {
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+    },
 
-  noteTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
+    noteTopRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+    },
 
-  noteIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    noteIconWrap: {
+      width: 42,
+      height: 42,
+      borderRadius: 16,
+      borderWidth: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  noteTextWrap: {
-    flex: 1,
-  },
+    noteTextWrap: {
+      flex: 1,
+    },
 
-  noteTitle: {
-    fontWeight: "800",
-    color: "#1F2937",
-    lineHeight: 23,
-    marginBottom: 6,
-  },
+    noteTitle: {
+      fontWeight: "800",
+      color: palette.text,
+      lineHeight: 23,
+      marginBottom: 6,
+    },
 
-  noteMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
+    noteMetaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
 
-  noteMetaText: {
-    flex: 1,
-    fontSize: 12.5,
-    color: "#667085",
-  },
+    noteMetaText: {
+      flex: 1,
+      fontSize: 12.5,
+      color: palette.textSecondary,
+    },
 
-  noteFooter: {
-    marginTop: 12,
-    gap: 10,
-  },
+    noteFooter: {
+      marginTop: 12,
+      gap: 10,
+    },
 
-  categoryChip: {
-    alignSelf: "flex-start",
-    borderWidth: 1,
-  },
+    categoryChip: {
+      alignSelf: "flex-start",
+      borderWidth: 1,
+    },
 
-  categoryChipText: {
-    fontWeight: "800",
-    fontSize: 12,
-  },
+    categoryChipText: {
+      fontWeight: "800",
+      fontSize: 12,
+    },
 
-  previewText: {
-    color: "#667085",
-    lineHeight: 19,
-    fontSize: 13.5,
-  },
+    previewText: {
+      color: palette.textSecondary,
+      lineHeight: 19,
+      fontSize: 13.5,
+    },
 
-  noteActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
+    noteActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
 
-  deleteNoteButton: {
-    margin: 0,
-    borderRadius: 14,
-    borderColor: "#F0C7C2",
-  },
+    deleteNoteButton: {
+      margin: 0,
+      borderRadius: 14,
+      borderColor: isDarkMode ? "rgba(255,107,107,0.30)" : "#F0C7C2",
+    },
 
-  deleteDialog: {
-    borderRadius: 24,
-    backgroundColor: "#FFFFFF",
-  },
+    deleteDialog: {
+      borderRadius: 24,
+      backgroundColor: palette.card,
+    },
 
-  deleteDialogContent: {
-    alignItems: "center",
-    paddingTop: 24,
-    paddingBottom: 18,
-  },
+    deleteDialogContent: {
+      alignItems: "center",
+      paddingTop: 24,
+      paddingBottom: 18,
+    },
 
-  deleteIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#C62828",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
-  },
+    deleteIconCircle: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: palette.danger,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 14,
+    },
 
-  deleteDialogTitle: {
-    fontWeight: "800",
-    color: "#1F2937",
-    textAlign: "center",
-    marginBottom: 8,
-  },
+    deleteDialogTitle: {
+      fontWeight: "800",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: 8,
+    },
 
-  deleteDialogText: {
-    color: "#667085",
-    textAlign: "center",
-    lineHeight: 21,
-    marginBottom: 18,
-  },
+    deleteDialogText: {
+      color: palette.textSecondary,
+      textAlign: "center",
+      lineHeight: 21,
+      marginBottom: 18,
+    },
 
-  deleteDialogStrong: {
-    fontWeight: "800",
-    color: "#1F2937",
-  },
+    deleteDialogStrong: {
+      fontWeight: "800",
+      color: palette.text,
+    },
 
-  deleteDialogActions: {
-    width: "100%",
-    flexDirection: "row",
-    gap: 10,
-  },
+    deleteDialogActions: {
+      width: "100%",
+      flexDirection: "row",
+      gap: 10,
+    },
 
-  cancelDeleteButton: {
-    flex: 1,
-    borderRadius: 16,
-    borderColor: "#D0D5DD",
-  },
+    cancelDeleteButton: {
+      flex: 1,
+      borderRadius: 16,
+      borderColor: palette.border,
+    },
 
-  confirmDeleteButton: {
-    flex: 1,
-    borderRadius: 16,
-  },
-});
+    confirmDeleteButton: {
+      flex: 1,
+      borderRadius: 16,
+    },
+  });
+}

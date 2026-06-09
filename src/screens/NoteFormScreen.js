@@ -1,6 +1,6 @@
 //Importaciones:
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
     Alert,
     KeyboardAvoidingView,
@@ -30,6 +30,48 @@ export default function NoteFormScreen({ navigation, route }) {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
     const { user } = useAuth();
+
+    const isDarkMode = !!theme.dark;
+    const custom = theme.custom || {};
+
+    const palette = useMemo(
+        () => ({
+        background: theme.colors.background,
+        surface: theme.colors.surface,
+        primary: theme.colors.primary,
+        text: theme.colors.onBackground,
+        textSecondary: custom.textSecondary || theme.colors.onSurfaceVariant,
+        textMuted: custom.textMuted || theme.colors.onSurfaceVariant,
+        border: custom.border || theme.colors.outline,
+        outline: custom.outline || theme.colors.outlineVariant || theme.colors.outline,
+        softBg: custom.softBg || theme.colors.surfaceVariant,
+        card: custom.card || theme.colors.surface,
+        inputBg: custom.inputBg || theme.colors.surface,
+        success: custom.success || "#2E7D32",
+        shadow: custom.shadow || "#000000",
+        }),
+        [theme, custom]
+    );
+
+    const styles = useMemo(
+        () => createStyles(palette, isDarkMode),
+        [palette, isDarkMode]
+    );
+
+    const inputTheme = useMemo(
+        () => ({
+        colors: {
+            primary: palette.primary,
+            outline: palette.border,
+            background: palette.inputBg,
+            onSurfaceVariant: palette.textSecondary,
+            onSurface: palette.text,
+            text: palette.text,
+            placeholder: palette.textMuted,
+        },
+        }),
+        [palette]
+    );
 
     const note = route?.params?.note || null;
     const isEditing = !!note?.id;
@@ -108,7 +150,10 @@ export default function NoteFormScreen({ navigation, route }) {
     return (
         <>
         <View style={styles.screen}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F4F8F1" />
+            <StatusBar
+            barStyle={isDarkMode ? "light-content" : "dark-content"}
+            backgroundColor={palette.background}
+            />
 
             <View style={styles.backgroundShapeTop} />
             <View style={styles.backgroundShapeBottom} />
@@ -148,13 +193,8 @@ export default function NoteFormScreen({ navigation, route }) {
                     outlineStyle={styles.inputOutline}
                     contentStyle={styles.inputContent}
                     left={<TextInput.Icon icon="format-title" />}
-                    theme={{
-                        colors: {
-                        primary: "#4E7A28",
-                        outline: "#C9D8BF",
-                        background: "#FFFFFF",
-                        },
-                    }}
+                    textColor={palette.text}
+                    theme={inputTheme}
                     />
 
                     <Text style={styles.fieldLabel}>Categoría</Text>
@@ -187,6 +227,7 @@ export default function NoteFormScreen({ navigation, route }) {
                         <Text style={styles.categorySelectorLabel}>
                             Seleccionada
                         </Text>
+
                         <Text
                             style={[
                             styles.categorySelectorValue,
@@ -198,11 +239,13 @@ export default function NoteFormScreen({ navigation, route }) {
                         </View>
                     </View>
 
-                    <MaterialCommunityIcons
+                    <View style={styles.chevronBadge}>
+                        <MaterialCommunityIcons
                         name="chevron-down"
                         size={22}
-                        color="#667085"
-                    />
+                        color={palette.textMuted}
+                        />
+                    </View>
                     </Pressable>
 
                     <TextInput
@@ -216,21 +259,17 @@ export default function NoteFormScreen({ navigation, route }) {
                     outlineStyle={styles.inputOutline}
                     contentStyle={styles.textAreaContent}
                     left={<TextInput.Icon icon="note-text-outline" />}
-                    theme={{
-                        colors: {
-                        primary: "#4E7A28",
-                        outline: "#C9D8BF",
-                        background: "#FFFFFF",
-                        },
-                    }}
+                    textColor={palette.text}
+                    theme={inputTheme}
                     />
 
                     <View style={styles.infoBox}>
                     <MaterialCommunityIcons
                         name="information-outline"
                         size={16}
-                        color="#6B7280"
+                        color={palette.textMuted}
                     />
+
                     <Text style={styles.infoText}>
                         Esta nota será visible para todos los usuarios del equipo y
                         cualquiera podrá editarla.
@@ -245,7 +284,8 @@ export default function NoteFormScreen({ navigation, route }) {
                     style={styles.saveButton}
                     contentStyle={styles.saveButtonContent}
                     labelStyle={styles.saveButtonLabel}
-                    buttonColor={theme.colors.primary}
+                    buttonColor={palette.primary}
+                    textColor="#FFFFFF"
                     icon={isEditing ? "content-save-outline" : "plus"}
                     >
                     {isEditing ? "Guardar cambios" : "Guardar nota"}
@@ -255,7 +295,7 @@ export default function NoteFormScreen({ navigation, route }) {
                     mode="text"
                     onPress={() => navigation.goBack()}
                     disabled={saving}
-                    textColor="#667085"
+                    textColor={palette.textSecondary}
                     style={styles.cancelButton}
                     >
                     Cancelar
@@ -292,8 +332,12 @@ export default function NoteFormScreen({ navigation, route }) {
                         style={({ pressed }) => [
                         styles.categoryOption,
                         {
-                            backgroundColor: selected ? item.soft : "#FFFFFF",
-                            borderColor: selected ? item.border : "#ECEFF3",
+                            backgroundColor: selected
+                            ? item.soft
+                            : isDarkMode
+                            ? "rgba(255,255,255,0.025)"
+                            : "#FFFFFF",
+                            borderColor: selected ? item.border : palette.border,
                         },
                         pressed && styles.categoryOptionPressed,
                         ]}
@@ -337,7 +381,10 @@ export default function NoteFormScreen({ navigation, route }) {
             </Dialog.ScrollArea>
 
             <Dialog.Actions>
-                <Button onPress={() => setCategoryDialogVisible(false)}>
+                <Button
+                onPress={() => setCategoryDialogVisible(false)}
+                textColor={palette.primary}
+                >
                 Cerrar
                 </Button>
             </Dialog.Actions>
@@ -368,7 +415,8 @@ export default function NoteFormScreen({ navigation, route }) {
                 onPress={handleCloseSuccess}
                 style={styles.successButton}
                 contentStyle={styles.successButtonContent}
-                buttonColor={theme.colors.primary}
+                buttonColor={palette.primary}
+                textColor="#FFFFFF"
                 >
                 Continuar
                 </Button>
@@ -379,216 +427,238 @@ export default function NoteFormScreen({ navigation, route }) {
     );
     }
 
-    const styles = StyleSheet.create({
-    flex: {
+    function createStyles(palette, isDarkMode) {
+    return StyleSheet.create({
+        flex: {
         flex: 1,
-    },
+        },
 
-    screen: {
+        screen: {
         flex: 1,
-        backgroundColor: "#F4F8F1",
-    },
+        backgroundColor: palette.background,
+        },
 
-    scrollContent: {
+        scrollContent: {
         flexGrow: 1,
         paddingHorizontal: 16,
-    },
+        },
 
-    backgroundShapeTop: {
+        backgroundShapeTop: {
         position: "absolute",
         top: -120,
         right: -70,
         width: 240,
         height: 240,
         borderRadius: 120,
-        backgroundColor: "rgba(78, 122, 40, 0.08)",
-    },
+        backgroundColor: isDarkMode
+            ? "rgba(240, 138, 43, 0.08)"
+            : "rgba(209, 107, 24, 0.06)",
+        },
 
-    backgroundShapeBottom: {
+        backgroundShapeBottom: {
         position: "absolute",
         bottom: -100,
         left: -60,
         width: 220,
         height: 220,
         borderRadius: 110,
-        backgroundColor: "rgba(78, 122, 40, 0.06)",
-    },
+        backgroundColor: isDarkMode
+            ? "rgba(240, 138, 43, 0.055)"
+            : "rgba(209, 107, 24, 0.045)",
+        },
 
-    headerBlock: {
+        headerBlock: {
         marginBottom: 16,
-    },
+        },
 
-    title: {
-        color: "#234015",
+        title: {
+        color: palette.text,
         fontWeight: "800",
         marginBottom: 8,
-    },
+        },
 
-    subtitle: {
-        color: "#5E6E57",
+        subtitle: {
+        color: palette.textSecondary,
         lineHeight: 21,
         maxWidth: 340,
-    },
+        },
 
-    card: {
+        card: {
         borderRadius: 24,
-        backgroundColor: "#FFFFFF",
+        backgroundColor: palette.card,
         borderWidth: 1,
-        borderColor: "#E3ECD9",
+        borderColor: palette.border,
         elevation: 3,
-    },
+        shadowColor: palette.shadow,
+        shadowOpacity: isDarkMode ? 0.18 : 0.06,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 6 },
+        },
 
-    cardContent: {
+        cardContent: {
         paddingHorizontal: 18,
         paddingTop: 20,
         paddingBottom: 18,
-    },
+        },
 
-    input: {
-        backgroundColor: "#FFFFFF",
+        input: {
+        backgroundColor: palette.inputBg,
         marginBottom: 14,
-    },
+        },
 
-    inputOutline: {
+        inputOutline: {
         borderRadius: 16,
-    },
+        },
 
-    inputContent: {
+        inputContent: {
         minHeight: 54,
-    },
+        color: palette.text,
+        },
 
-    fieldLabel: {
+        fieldLabel: {
         fontSize: 13,
         fontWeight: "800",
-        color: "#344054",
+        color: palette.text,
         marginBottom: 8,
-    },
+        },
 
-    categorySelector: {
+        categorySelector: {
         minHeight: 62,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: "#C9D8BF",
-        backgroundColor: "#FFFFFF",
+        borderColor: palette.border,
+        backgroundColor: palette.inputBg,
         paddingHorizontal: 12,
         paddingVertical: 10,
         marginBottom: 14,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-    },
+        },
 
-    categorySelectorPressed: {
+        categorySelectorPressed: {
         opacity: 0.9,
-    },
+        },
 
-    categorySelectorLeft: {
+        categorySelectorLeft: {
         flexDirection: "row",
         alignItems: "center",
         gap: 10,
         flex: 1,
-    },
+        },
 
-    categoryIconWrap: {
+        categoryIconWrap: {
         width: 40,
         height: 40,
         borderRadius: 14,
         borderWidth: 1,
         alignItems: "center",
         justifyContent: "center",
-    },
+        },
 
-    categoryTextWrap: {
+        categoryTextWrap: {
         flex: 1,
-    },
+        },
 
-    categorySelectorLabel: {
+        categorySelectorLabel: {
         fontSize: 11.5,
-        color: "#667085",
+        color: palette.textSecondary,
         fontWeight: "600",
         marginBottom: 2,
-    },
+        },
 
-    categorySelectorValue: {
+        categorySelectorValue: {
         fontSize: 14.5,
         fontWeight: "800",
-    },
+        },
 
-    textArea: {
-        backgroundColor: "#FFFFFF",
+        chevronBadge: {
+        width: 34,
+        height: 34,
+        borderRadius: 13,
+        backgroundColor: isDarkMode ? "rgba(255,255,255,0.035)" : "#F8F7F5",
+        borderWidth: 1,
+        borderColor: palette.border,
+        alignItems: "center",
+        justifyContent: "center",
+        },
+
+        textArea: {
+        backgroundColor: palette.inputBg,
         marginBottom: 14,
         minHeight: 200,
-    },
+        },
 
-    textAreaContent: {
+        textAreaContent: {
         minHeight: 190,
         paddingTop: 12,
-    },
+        color: palette.text,
+        },
 
-    infoBox: {
+        infoBox: {
         width: "100%",
         flexDirection: "row",
         gap: 8,
         alignItems: "flex-start",
-        backgroundColor: "#FAFBFA",
+        backgroundColor: isDarkMode ? "rgba(255,255,255,0.035)" : "#FAF8F5",
         borderWidth: 1,
-        borderColor: "#ECEFF3",
+        borderColor: palette.border,
         paddingHorizontal: 12,
         paddingVertical: 10,
         borderRadius: 14,
         marginBottom: 16,
-    },
+        },
 
-    infoText: {
+        infoText: {
         flex: 1,
         fontSize: 12.5,
-        color: "#667085",
+        color: palette.textSecondary,
         lineHeight: 18,
-    },
+        },
 
-    saveButton: {
+        saveButton: {
         borderRadius: 16,
-    },
+        },
 
-    saveButtonContent: {
+        saveButtonContent: {
         height: 50,
-    },
+        },
 
-    saveButtonLabel: {
+        saveButtonLabel: {
         fontSize: 15,
         fontWeight: "700",
-    },
+        },
 
-    cancelButton: {
+        cancelButton: {
         marginTop: 6,
-    },
+        },
 
-    categoryDialog: {
+        categoryDialog: {
         borderRadius: 24,
-        backgroundColor: "#FFFFFF",
-    },
+        backgroundColor: palette.card,
+        },
 
-    categoryDialogTitle: {
+        categoryDialogTitle: {
         fontWeight: "800",
-        color: "#1F2937",
-    },
+        color: palette.text,
+        },
 
-    categoryDialogScrollArea: {
+        categoryDialogScrollArea: {
         paddingHorizontal: 0,
         maxHeight: 430,
-    },
+        },
 
-    categoryDialogScroll: {
+        categoryDialogScroll: {
         maxHeight: 420,
-    },
+        },
 
-    categoryDialogContent: {
+        categoryDialogContent: {
         paddingHorizontal: 18,
         paddingVertical: 8,
         gap: 10,
-    },
+        },
 
-    categoryOption: {
+        categoryOption: {
         minHeight: 58,
         borderRadius: 18,
         borderWidth: 1,
@@ -597,69 +667,70 @@ export default function NoteFormScreen({ navigation, route }) {
         flexDirection: "row",
         alignItems: "center",
         gap: 10,
-    },
+        },
 
-    categoryOptionPressed: {
+        categoryOptionPressed: {
         opacity: 0.9,
-    },
+        },
 
-    categoryOptionIcon: {
+        categoryOptionIcon: {
         width: 38,
         height: 38,
         borderRadius: 14,
         borderWidth: 1,
         alignItems: "center",
         justifyContent: "center",
-    },
+        },
 
-    categoryOptionText: {
+        categoryOptionText: {
         flex: 1,
         fontSize: 14,
         fontWeight: "800",
-        color: "#344054",
-    },
+        color: palette.text,
+        },
 
-    successDialog: {
+        successDialog: {
         borderRadius: 24,
-        backgroundColor: "#FFFFFF",
-    },
+        backgroundColor: palette.card,
+        },
 
-    successDialogContent: {
+        successDialogContent: {
         alignItems: "center",
         paddingTop: 24,
         paddingBottom: 18,
-    },
+        },
 
-    successIconCircle: {
+        successIconCircle: {
         width: 64,
         height: 64,
         borderRadius: 32,
-        backgroundColor: "#4E7A28",
+        backgroundColor: palette.success,
         alignItems: "center",
         justifyContent: "center",
         marginBottom: 14,
-    },
+        },
 
-    successTitle: {
+        successTitle: {
         fontWeight: "800",
-        color: "#1F2937",
+        color: palette.text,
         textAlign: "center",
         marginBottom: 8,
-    },
+        },
 
-    successText: {
-        color: "#667085",
+        successText: {
+        color: palette.textSecondary,
         textAlign: "center",
         lineHeight: 21,
         marginBottom: 18,
-    },
+        },
 
-    successButton: {
+        successButton: {
         width: "100%",
         borderRadius: 16,
-    },
+        },
 
-    successButtonContent: {
+        successButtonContent: {
         height: 48,
-    },
-});
+        },
+    });
+}

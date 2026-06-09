@@ -1,7 +1,7 @@
 //Importaciones:
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Animated, Pressable, StyleSheet, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import DriveScreen from "../screens/DriveScreen";
@@ -15,6 +15,7 @@ const Tab = createBottomTabNavigator();
 
 const hexToRgba = (hex, alpha = 1) => {
   const clean = String(hex || "").replace("#", "");
+
   const full =
     clean.length === 3
       ? clean
@@ -27,6 +28,10 @@ const hexToRgba = (hex, alpha = 1) => {
   const g = parseInt(full.slice(2, 4), 16);
   const b = parseInt(full.slice(4, 6), 16);
 
+  if ([r, g, b].some((value) => Number.isNaN(value))) {
+    return `rgba(209, 107, 24, ${alpha})`;
+  }
+
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
@@ -37,6 +42,7 @@ function TabBarButton({
   style,
   rippleColor = "rgba(0,0,0,0.08)",
   focused = false,
+  styles,
   ...rest
 }) {
   const rippleScale = useRef(new Animated.Value(0)).current;
@@ -117,7 +123,15 @@ function TabBarButton({
   );
 }
 
-function TabIconLabel({ routeName, color, size, focused, primary }) {
+function TabIconLabel({
+  routeName,
+  color,
+  size,
+  focused,
+  primary,
+  isDarkMode,
+  styles,
+}) {
   let iconName = "home-outline";
   let label = routeName;
 
@@ -151,7 +165,14 @@ function TabIconLabel({ routeName, color, size, focused, primary }) {
       <View
         style={[
           styles.iconPill,
-          focused && { backgroundColor: hexToRgba(primary, 0.12) },
+          focused && {
+            backgroundColor: isDarkMode
+              ? hexToRgba(primary, 0.18)
+              : hexToRgba(primary, 0.12),
+            borderColor: isDarkMode
+              ? hexToRgba(primary, 0.28)
+              : hexToRgba(primary, 0.18),
+          },
         ]}
       >
         <MaterialCommunityIcons name={iconName} size={size} color={color} />
@@ -162,7 +183,7 @@ function TabIconLabel({ routeName, color, size, focused, primary }) {
           styles.customLabel,
           {
             color,
-            fontWeight: focused ? "700" : "600",
+            fontWeight: focused ? "800" : "600",
           },
         ]}
         numberOfLines={1}
@@ -176,8 +197,31 @@ function TabIconLabel({ routeName, color, size, focused, primary }) {
 export default function AppTabs() {
   const theme = useTheme();
 
+  const isDarkMode = !!theme.dark;
   const primary = theme.colors.primary;
-  const primarySoft = hexToRgba(primary, 0.14);
+
+  const custom = theme.custom || {};
+
+  const tabBackground = custom.tabBg || theme.colors.surface;
+  const tabBorder = custom.border || theme.colors.outline;
+  const inactiveColor = custom.textMuted || theme.colors.onSurfaceVariant;
+  const shadowColor = custom.shadow || "#000000";
+
+  const primarySoft = isDarkMode
+    ? hexToRgba(primary, 0.18)
+    : hexToRgba(primary, 0.14);
+
+  const styles = useMemo(
+    () =>
+      createStyles({
+        isDarkMode,
+        primary,
+        tabBackground,
+        tabBorder,
+        shadowColor,
+      }),
+    [isDarkMode, primary, tabBackground, tabBorder, shadowColor]
+  );
 
   return (
     <Tab.Navigator
@@ -185,20 +229,20 @@ export default function AppTabs() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: primary,
-        tabBarInactiveTintColor: "#98A2B3",
+        tabBarInactiveTintColor: inactiveColor,
         tabBarHideOnKeyboard: true,
 
         tabBarStyle: {
-          backgroundColor: "#FFFFFF",
-          borderTopColor: "#E6ECE1",
+          backgroundColor: tabBackground,
+          borderTopColor: tabBorder,
           borderTopWidth: 1,
           height: 110,
           paddingTop: 4,
-          shadowColor: "#000",
-          shadowOpacity: 0.04,
-          shadowRadius: 10,
+          shadowColor,
+          shadowOpacity: isDarkMode ? 0.22 : 0.06,
+          shadowRadius: 12,
           shadowOffset: { width: 0, height: -2 },
-          elevation: 8,
+          elevation: 10,
         },
 
         tabBarShowLabel: false,
@@ -210,6 +254,7 @@ export default function AppTabs() {
         tabBarButton: (props) => (
           <TabBarButton
             {...props}
+            styles={styles}
             rippleColor={primarySoft}
             focused={props.accessibilityState?.selected}
           />
@@ -222,6 +267,8 @@ export default function AppTabs() {
             size={27}
             focused={focused}
             primary={primary}
+            isDarkMode={isDarkMode}
+            styles={styles}
           />
         ),
       })}
@@ -259,52 +306,57 @@ export default function AppTabs() {
   );
 }
 
-const styles = StyleSheet.create({
-  tabButtonBase: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+function createStyles({ isDarkMode, primary, tabBackground, tabBorder }) {
+  return StyleSheet.create({
+    tabButtonBase: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  tabButtonPressed: {
-    opacity: 0.95,
-  },
+    tabButtonPressed: {
+      opacity: 0.95,
+    },
 
-  innerButtonWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    innerButtonWrap: {
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  rippleContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    rippleContainer: {
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  rippleCircle: {
-    width: 82,
-    height: 70,
-    borderRadius: 26,
-  },
+    rippleCircle: {
+      width: 82,
+      height: 70,
+      borderRadius: 26,
+    },
 
-  tabContent: {
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 72,
-  },
+    tabContent: {
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: 72,
+    },
 
-  iconPill: {
-    minWidth: 46,
-    height: 36,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
-  },
+    iconPill: {
+      minWidth: 46,
+      height: 36,
+      paddingHorizontal: 10,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: "transparent",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 4,
+      backgroundColor: "transparent",
+    },
 
-  customLabel: {
-    fontSize: 11.5,
-    lineHeight: 15,
-    marginBottom: 6,
-  },
-});
+    customLabel: {
+      fontSize: 11.5,
+      lineHeight: 15,
+      marginBottom: 6,
+    },
+  });
+}

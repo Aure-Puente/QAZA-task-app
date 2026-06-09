@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "QAZA Workspace",
-    "slug": "qaza-workspace",
+    "name": "QAZA",
+    "slug": "qaza",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/logo-icon.png",
-    "scheme": "qazaworkspace",
+    "scheme": "qaza",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -21,8 +21,8 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.aure.qazaworkspace",
-      "label": "QAZA Workspace",
+      "package": "com.aure.qaza",
+      "label": "QAZA",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/adaptive-icon.png"
@@ -39,7 +39,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "0bf71ce5-a18f-41d0-9539-0ae0341dfaaf"
+        "projectId": "e1425e1e-d40d-45f0-8481-487c236b40fb"
       }
     },
     "owner": "aurex",

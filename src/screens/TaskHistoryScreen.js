@@ -66,10 +66,78 @@ function getInitials(name) {
   return safeName.charAt(0).toUpperCase();
 }
 
+function getTaskResponsibleNames(task) {
+  if (Array.isArray(task?.assignedUsers) && task.assignedUsers.length > 0) {
+    const names = task.assignedUsers
+      .map((item) => item?.name || item?.nombre || item?.email || "")
+      .filter(Boolean);
+
+    if (names.length > 0) return names;
+  }
+
+  if (task?.assignedToName) {
+    return [task.assignedToName];
+  }
+
+  return ["Sin asignar"];
+}
+
+function getTaskResponsibleIds(task) {
+  const ids = [];
+
+  if (task?.assignedTo) {
+    ids.push(String(task.assignedTo));
+  }
+
+  if (Array.isArray(task?.assignedUsers)) {
+    task.assignedUsers.forEach((item) => {
+      if (item?.uid) ids.push(String(item.uid));
+      if (item?.id) ids.push(String(item.id));
+      if (item?.userId) ids.push(String(item.userId));
+    });
+  }
+
+  return [...new Set(ids)];
+}
+
+function isTaskAssignedToUser(task, userId) {
+  if (!userId) return false;
+
+  const ids = getTaskResponsibleIds(task);
+  return ids.some((id) => String(id) === String(userId));
+}
+
 export default function TaskHistoryScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+
+  const isDarkMode = !!theme.dark;
+  const custom = theme.custom || {};
+
+  const palette = useMemo(
+    () => ({
+      background: theme.colors.background,
+      surface: theme.colors.surface,
+      primary: theme.colors.primary,
+      text: theme.colors.onBackground,
+      textSecondary: custom.textSecondary || theme.colors.onSurfaceVariant,
+      textMuted: custom.textMuted || theme.colors.onSurfaceVariant,
+      border: custom.border || theme.colors.outline,
+      softBg: custom.softBg || theme.colors.surfaceVariant,
+      card: custom.card || theme.colors.surface,
+      success: custom.success || "#2E7D32",
+      successSoft: custom.doneBg || "rgba(46,125,50,0.10)",
+      successText: custom.doneText || "#2E7D32",
+      shadow: custom.shadow || "#000000",
+    }),
+    [theme, custom]
+  );
+
+  const styles = useMemo(
+    () => createStyles(palette, isDarkMode),
+    [palette, isDarkMode]
+  );
 
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -126,11 +194,11 @@ export default function TaskHistoryScreen() {
   const filteredTasks = useMemo(() => {
     return completedTasks.filter((task) => {
       if (ownerFilter === "mine") {
-        if (String(task.assignedTo) !== String(user?.uid)) return false;
+        if (!isTaskAssignedToUser(task, user?.uid)) return false;
       }
 
       if (ownerFilter === "others") {
-        if (String(task.assignedTo) === String(user?.uid)) return false;
+        if (isTaskAssignedToUser(task, user?.uid)) return false;
       }
 
       if (categoryFilter) {
@@ -166,7 +234,10 @@ export default function TaskHistoryScreen() {
   return (
     <>
       <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F4F8F1" />
+        <StatusBar
+          barStyle={isDarkMode ? "light-content" : "dark-content"}
+          backgroundColor={palette.background}
+        />
 
         <View style={styles.backgroundShapeTop} />
         <View style={styles.backgroundShapeBottom} />
@@ -196,7 +267,7 @@ export default function TaskHistoryScreen() {
                     <MaterialCommunityIcons
                       name="filter-variant"
                       size={15}
-                      color={theme.colors.primary}
+                      color={palette.primary}
                     />
                   </View>
 
@@ -236,16 +307,13 @@ export default function TaskHistoryScreen() {
                   ]}
                   textStyle={[
                     styles.filterChipText,
-                    ownerFilter === "mine" && {
-                      color: theme.colors.primary,
-                      fontWeight: "800",
-                    },
+                    ownerFilter === "mine" && styles.filterChipTextSelected,
                   ]}
                   icon={() => (
                     <MaterialCommunityIcons
                       name="account-check-outline"
                       size={14}
-                      color={ownerFilter === "mine" ? theme.colors.primary : "#667085"}
+                      color={ownerFilter === "mine" ? palette.primary : palette.textMuted}
                     />
                   )}
                 >
@@ -263,17 +331,14 @@ export default function TaskHistoryScreen() {
                   ]}
                   textStyle={[
                     styles.filterChipText,
-                    ownerFilter === "others" && {
-                      color: theme.colors.primary,
-                      fontWeight: "800",
-                    },
+                    ownerFilter === "others" && styles.filterChipTextSelected,
                   ]}
                   icon={() => (
                     <MaterialCommunityIcons
                       name="account-group-outline"
                       size={14}
                       color={
-                        ownerFilter === "others" ? theme.colors.primary : "#667085"
+                        ownerFilter === "others" ? palette.primary : palette.textMuted
                       }
                     />
                   )}
@@ -304,7 +369,7 @@ export default function TaskHistoryScreen() {
                     <MaterialCommunityIcons
                       name={selectedCategory?.icon || "shape-outline"}
                       size={14}
-                      color={categoryFilter ? selectedCategory?.color : "#667085"}
+                      color={categoryFilter ? selectedCategory?.color : palette.textMuted}
                     />
                   )}
                 >
@@ -332,7 +397,7 @@ export default function TaskHistoryScreen() {
 
           {loading ? (
             <View style={styles.centered}>
-              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <ActivityIndicator size="large" color={palette.primary} />
               <Text style={styles.loadingText}>Cargando historial...</Text>
             </View>
           ) : filteredTasks.length === 0 ? (
@@ -342,7 +407,7 @@ export default function TaskHistoryScreen() {
                   <MaterialCommunityIcons
                     name="clipboard-text-clock-outline"
                     size={34}
-                    color={theme.colors.primary}
+                    color={palette.primary}
                   />
                 </View>
 
@@ -359,6 +424,7 @@ export default function TaskHistoryScreen() {
             <View style={styles.tasksList}>
               {filteredTasks.map((task) => {
                 const category = getNoteCategoryByKey(task.categoryKey);
+                const responsibleNames = getTaskResponsibleNames(task);
 
                 return (
                   <Card key={task.id} style={styles.taskCard}>
@@ -373,7 +439,7 @@ export default function TaskHistoryScreen() {
                           ]}
                         >
                           <Text style={styles.taskAvatarText}>
-                            {getInitials(task.assignedToName)}
+                            {getInitials(responsibleNames[0])}
                           </Text>
                         </View>
 
@@ -429,7 +495,7 @@ export default function TaskHistoryScreen() {
                           <MaterialCommunityIcons
                             name="check-circle-outline"
                             size={13}
-                            color="#2E7D32"
+                            color={palette.successText}
                           />
                           <Text style={styles.completedChipText}>Completada</Text>
                         </View>
@@ -446,13 +512,13 @@ export default function TaskHistoryScreen() {
                           <MaterialCommunityIcons
                             name="account-check-outline"
                             size={15}
-                            color="#667085"
+                            color={palette.textMuted}
                           />
 
                           <Text style={styles.metaText}>
                             Responsable{" "}
                             <Text style={styles.metaStrong}>
-                              {task.assignedToName || "Sin asignar"}
+                              {responsibleNames.join(", ") || "Sin asignar"}
                             </Text>
                           </Text>
                         </View>
@@ -461,7 +527,7 @@ export default function TaskHistoryScreen() {
                           <MaterialCommunityIcons
                             name="account-edit-outline"
                             size={15}
-                            color="#667085"
+                            color={palette.textMuted}
                           />
 
                           <Text style={styles.metaText}>
@@ -476,7 +542,7 @@ export default function TaskHistoryScreen() {
                           <MaterialCommunityIcons
                             name="calendar-month-outline"
                             size={15}
-                            color="#667085"
+                            color={palette.textMuted}
                           />
 
                           <Text style={styles.metaText}>
@@ -522,8 +588,12 @@ export default function TaskHistoryScreen() {
                     style={({ pressed }) => [
                       styles.categoryOption,
                       {
-                        backgroundColor: selected ? item.soft : "#FFFFFF",
-                        borderColor: selected ? item.border : "#ECEFF3",
+                        backgroundColor: selected
+                          ? item.soft
+                          : isDarkMode
+                          ? "rgba(255,255,255,0.025)"
+                          : "#FFFFFF",
+                        borderColor: selected ? item.border : palette.border,
                       },
                       pressed && styles.categoryOptionPressed,
                     ]}
@@ -573,13 +643,16 @@ export default function TaskHistoryScreen() {
                   setCategoryFilter(null);
                   setCategoryDialogVisible(false);
                 }}
-                textColor="#667085"
+                textColor={palette.textSecondary}
               >
                 Quitar filtro
               </Button>
             ) : null}
 
-            <Button onPress={() => setCategoryDialogVisible(false)}>
+            <Button
+              onPress={() => setCategoryDialogVisible(false)}
+              textColor={palette.primary}
+            >
               Cerrar
             </Button>
           </Dialog.Actions>
@@ -589,387 +662,424 @@ export default function TaskHistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#F4F8F1",
-  },
+function createStyles(palette, isDarkMode) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
 
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 16,
-  },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: 16,
+    },
 
-  backgroundShapeTop: {
-    position: "absolute",
-    top: -120,
-    right: -70,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: "rgba(78, 122, 40, 0.08)",
-  },
+    backgroundShapeTop: {
+      position: "absolute",
+      top: -120,
+      right: -70,
+      width: 240,
+      height: 240,
+      borderRadius: 120,
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.12)"
+        : "rgba(209, 107, 24, 0.10)",
+    },
 
-  backgroundShapeBottom: {
-    position: "absolute",
-    bottom: -100,
-    left: -60,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "rgba(78, 122, 40, 0.06)",
-  },
+    backgroundShapeBottom: {
+      position: "absolute",
+      bottom: -100,
+      left: -60,
+      width: 220,
+      height: 220,
+      borderRadius: 110,
+      backgroundColor: isDarkMode
+        ? "rgba(209, 107, 24, 0.10)"
+        : "rgba(240, 138, 43, 0.08)",
+    },
 
-  headerBlock: {
-    marginBottom: 16,
-  },
+    headerBlock: {
+      marginBottom: 16,
+    },
 
-  title: {
-    color: "#234015",
-    fontWeight: "800",
-    marginBottom: 8,
-  },
+    title: {
+      color: palette.text,
+      fontWeight: "800",
+      marginBottom: 8,
+    },
 
-  subtitle: {
-    color: "#5E6E57",
-    lineHeight: 21,
-    maxWidth: 340,
-  },
+    subtitle: {
+      color: palette.textSecondary,
+      lineHeight: 21,
+      maxWidth: 340,
+    },
 
-  filtersCard: {
-    borderRadius: 20,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    elevation: 1,
-    marginBottom: 18,
-  },
+    filtersCard: {
+      borderRadius: 20,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+      elevation: 1,
+      marginBottom: 18,
+      shadowColor: palette.shadow,
+      shadowOpacity: isDarkMode ? 0.18 : 0.06,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+    },
 
-  filtersContent: {
-    paddingHorizontal: 12,
-    paddingTop: 11,
-    paddingBottom: 11,
-  },
+    filtersContent: {
+      paddingHorizontal: 12,
+      paddingTop: 11,
+      paddingBottom: 11,
+    },
 
-  filtersTopRow: {
-    height: 28,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 9,
-    overflow: "hidden",
-  },
+    filtersTopRow: {
+      height: 28,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 9,
+      overflow: "hidden",
+    },
 
-  filtersTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    flex: 1,
-  },
+    filtersTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 7,
+      flex: 1,
+    },
 
-  filtersIconWrap: {
-    width: 27,
-    height: 27,
-    borderRadius: 10,
-    backgroundColor: "#F6F9F2",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    filtersIconWrap: {
+      width: 27,
+      height: 27,
+      borderRadius: 10,
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.14)"
+        : "rgba(209, 107, 24, 0.11)",
+      borderWidth: 1,
+      borderColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.25)"
+        : "rgba(209, 107, 24, 0.22)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  filtersTitle: {
-    fontSize: 13.5,
-    fontWeight: "800",
-    color: "#344054",
-  },
+    filtersTitle: {
+      fontSize: 13.5,
+      fontWeight: "800",
+      color: palette.text,
+    },
 
-  clearFiltersPressable: {
-    width: 64,
-    height: 28,
-    alignItems: "flex-end",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
+    clearFiltersPressable: {
+      width: 64,
+      height: 28,
+      alignItems: "flex-end",
+      justifyContent: "center",
+      overflow: "hidden",
+    },
 
-  clearFiltersText: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: "#667085",
-  },
+    clearFiltersText: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: palette.textSecondary,
+    },
 
-  clearFiltersTextHidden: {
-    opacity: 0,
-  },
+    clearFiltersTextHidden: {
+      opacity: 0,
+    },
 
-  filtersScrollContent: {
-    gap: 8,
-    paddingRight: 4,
-  },
+    filtersScrollContent: {
+      gap: 8,
+      paddingRight: 4,
+    },
 
-  filterChip: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
+    filterChip: {
+      backgroundColor: isDarkMode ? "rgba(255,255,255,0.025)" : "#FFFFFF",
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
 
-  filterChipSelected: {
-    backgroundColor: "rgba(78,122,40,0.10)",
-    borderColor: "rgba(78,122,40,0.25)",
-  },
+    filterChipSelected: {
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.14)"
+        : "rgba(209, 107, 24, 0.11)",
+      borderColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.28)"
+        : "rgba(209, 107, 24, 0.25)",
+    },
 
-  filterChipText: {
-    fontSize: 12,
-    color: "#667085",
-    fontWeight: "700",
-  },
+    filterChipText: {
+      fontSize: 12,
+      color: palette.textMuted,
+      fontWeight: "700",
+    },
 
-  sectionHeader: {
-    marginBottom: 12,
-  },
+    filterChipTextSelected: {
+      color: palette.primary,
+      fontWeight: "800",
+    },
 
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#234015",
-    marginBottom: 3,
-  },
+    sectionHeader: {
+      marginBottom: 12,
+    },
 
-  sectionSubtitle: {
-    fontSize: 13,
-    color: "#667085",
-  },
+    sectionTitle: {
+      fontSize: 17,
+      fontWeight: "800",
+      color: palette.text,
+      marginBottom: 3,
+    },
 
-  centered: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 50,
-  },
+    sectionSubtitle: {
+      fontSize: 13,
+      color: palette.textSecondary,
+    },
 
-  loadingText: {
-    marginTop: 10,
-    color: "#667085",
-    fontWeight: "600",
-  },
+    centered: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 50,
+    },
 
-  emptyCard: {
-    borderRadius: 24,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    elevation: 2,
-  },
+    loadingText: {
+      marginTop: 10,
+      color: palette.textSecondary,
+      fontWeight: "600",
+    },
 
-  emptyContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 30,
-    alignItems: "center",
-  },
+    emptyCard: {
+      borderRadius: 24,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+      elevation: 2,
+      shadowColor: palette.shadow,
+      shadowOpacity: isDarkMode ? 0.18 : 0.06,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+    },
 
-  emptyIconCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: "#F6F9F2",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
+    emptyContent: {
+      paddingHorizontal: 20,
+      paddingVertical: 30,
+      alignItems: "center",
+    },
 
-  emptyTitle: {
-    fontWeight: "800",
-    color: "#1F2937",
-    textAlign: "center",
-    marginBottom: 8,
-  },
+    emptyIconCircle: {
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.14)"
+        : "rgba(209, 107, 24, 0.11)",
+      borderWidth: 1,
+      borderColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.25)"
+        : "rgba(209, 107, 24, 0.22)",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 16,
+    },
 
-  emptyText: {
-    color: "#667085",
-    textAlign: "center",
-    lineHeight: 21,
-  },
+    emptyTitle: {
+      fontWeight: "800",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: 8,
+    },
 
-  tasksList: {
-    gap: 12,
-  },
+    emptyText: {
+      color: palette.textSecondary,
+      textAlign: "center",
+      lineHeight: 21,
+    },
 
-  taskCard: {
-    borderRadius: 22,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    elevation: 2,
-  },
+    tasksList: {
+      gap: 12,
+    },
 
-  taskContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
+    taskCard: {
+      borderRadius: 22,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+      elevation: 2,
+      shadowColor: palette.shadow,
+      shadowOpacity: isDarkMode ? 0.18 : 0.06,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+    },
 
-  taskTop: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    marginBottom: 12,
-  },
+    taskContent: {
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+    },
 
-  taskAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    taskTop: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+      marginBottom: 12,
+    },
 
-  taskAvatarText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "900",
-  },
+    taskAvatar: {
+      width: 46,
+      height: 46,
+      borderRadius: 17,
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  taskTitleWrap: {
-    flex: 1,
-  },
+    taskAvatarText: {
+      color: "#FFFFFF",
+      fontSize: 18,
+      fontWeight: "900",
+    },
 
-  taskTitle: {
-    fontWeight: "800",
-    color: "#1F2937",
-    lineHeight: 23,
-    marginBottom: 4,
-  },
+    taskTitleWrap: {
+      flex: 1,
+    },
 
-  taskDateText: {
-    fontSize: 12.5,
-    color: "#667085",
-    textTransform: "capitalize",
-  },
+    taskTitle: {
+      fontWeight: "800",
+      color: palette.text,
+      lineHeight: 23,
+      marginBottom: 4,
+    },
 
-  doneBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 12,
-    backgroundColor: "#2E7D32",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    taskDateText: {
+      fontSize: 12.5,
+      color: palette.textSecondary,
+      textTransform: "capitalize",
+    },
 
-  chipsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 10,
-  },
+    doneBadge: {
+      width: 32,
+      height: 32,
+      borderRadius: 12,
+      backgroundColor: palette.success,
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  categoryChip: {
-    alignSelf: "flex-start",
-    borderWidth: 1,
-  },
+    chipsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 10,
+    },
 
-  categoryChipText: {
-    fontWeight: "800",
-    fontSize: 12,
-  },
+    categoryChip: {
+      alignSelf: "flex-start",
+      borderWidth: 1,
+    },
 
-  completedChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    backgroundColor: "rgba(46,125,50,0.10)",
-    borderColor: "rgba(46,125,50,0.18)",
-  },
+    categoryChipText: {
+      fontWeight: "800",
+      fontSize: 12,
+    },
 
-  completedChipText: {
-    fontSize: 11.5,
-    fontWeight: "800",
-    color: "#2E7D32",
-  },
+    completedChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      borderWidth: 1,
+      borderRadius: 999,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+      backgroundColor: palette.successSoft,
+      borderColor: isDarkMode
+        ? "rgba(125,216,125,0.24)"
+        : "rgba(46,125,50,0.18)",
+    },
 
-  taskDescription: {
-    color: "#475467",
-    lineHeight: 19,
-    marginBottom: 10,
-  },
+    completedChipText: {
+      fontSize: 11.5,
+      fontWeight: "800",
+      color: palette.successText,
+    },
 
-  metaStack: {
-    gap: 7,
-  },
+    taskDescription: {
+      color: palette.textSecondary,
+      lineHeight: 19,
+      marginBottom: 10,
+    },
 
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
+    metaStack: {
+      gap: 7,
+    },
 
-  metaText: {
-    flex: 1,
-    fontSize: 13,
-    color: "#667085",
-  },
+    metaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
 
-  metaStrong: {
-    fontWeight: "800",
-    color: "#344054",
-  },
+    metaText: {
+      flex: 1,
+      fontSize: 13,
+      color: palette.textSecondary,
+    },
 
-  categoryDialog: {
-    borderRadius: 24,
-    backgroundColor: "#FFFFFF",
-  },
+    metaStrong: {
+      fontWeight: "800",
+      color: palette.text,
+    },
 
-  categoryDialogTitle: {
-    color: "#234015",
-    fontWeight: "800",
-  },
+    categoryDialog: {
+      borderRadius: 24,
+      backgroundColor: palette.card,
+    },
 
-  categoryDialogScrollArea: {
-    paddingHorizontal: 0,
-    maxHeight: 430,
-  },
+    categoryDialogTitle: {
+      color: palette.text,
+      fontWeight: "800",
+    },
 
-  categoryDialogScroll: {
-    maxHeight: 420,
-  },
+    categoryDialogScrollArea: {
+      paddingHorizontal: 0,
+      maxHeight: 430,
+    },
 
-  categoryDialogContent: {
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    gap: 10,
-  },
+    categoryDialogScroll: {
+      maxHeight: 420,
+    },
 
-  categoryOption: {
-    minHeight: 58,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
+    categoryDialogContent: {
+      paddingHorizontal: 18,
+      paddingVertical: 8,
+      gap: 10,
+    },
 
-  categoryOptionPressed: {
-    opacity: 0.9,
-  },
+    categoryOption: {
+      minHeight: 58,
+      borderRadius: 18,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
 
-  categoryOptionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    categoryOptionPressed: {
+      opacity: 0.9,
+    },
 
-  categoryOptionText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#344054",
-  },
-});
+    categoryOptionIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 14,
+      borderWidth: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    categoryOptionText: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: "800",
+      color: palette.text,
+    },
+  });
+}

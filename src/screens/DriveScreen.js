@@ -1,5 +1,6 @@
 //Importaciones:
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { useMemo } from "react";
 import {
     Linking,
     Pressable,
@@ -14,40 +15,74 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 //JS:
 const DRIVE_FOLDERS = [
     {
+        id: "administracion",
+        title: "Administración",
+        description: "Accedé a documentos, planillas y archivos administrativos.",
+        icon: "briefcase-outline",
+        color: "#C62828",
+        soft: "rgba(198, 40, 40, 0.10)",
+        border: "rgba(198, 40, 40, 0.22)",
+        url: "https://drive.google.com/drive/folders/1byoUnm-4pJZ45mmlgvKUq7PXosMTA_ni",
+    },
+    {
+        id: "comunicacion",
+        title: "Comunicación",
+        description: "Materiales, recursos y contenidos del área de comunicación.",
+        icon: "message-text-outline",
+        color: "#7C3AED",
+        soft: "rgba(124, 58, 237, 0.11)",
+        border: "rgba(124, 58, 237, 0.24)",
+        url: "https://drive.google.com/drive/folders/1MlTGhDRcjZGM4VAOTT514W8mwHro435U",
+    },
+    {
         id: "produccion",
         title: "Producción",
-        description: "Accedé a la carpeta de producción del equipo.",
-        icon: "sprout",
-        color: "#16A34A",
-        soft: "rgba(22, 163, 74, 0.12)",
-        border: "rgba(22, 163, 74, 0.24)",
-        url: "https://drive.google.com/drive/folders/1tvQv4bstuOGmDYQk2g-3wrHx_LyiebrF",
+        description: "Accedé a archivos, recursos y materiales de producción.",
+        icon: "package-variant-closed",
+        color: "#D16B18",
+        soft: "rgba(209, 107, 24, 0.11)",
+        border: "rgba(209, 107, 24, 0.24)",
+        url: "https://drive.google.com/drive/folders/1O9PplReeUQIGwi0yoeRQt6kqUN2ztfSo",
     },
     {
-        id: "redes",
-        title: "Redes",
-        description: "Materiales, archivos y recursos relacionados a redes.",
-        icon: "access-point-network",
-        color: "#7C3AED",
-        soft: "rgba(124, 58, 237, 0.12)",
-        border: "rgba(124, 58, 237, 0.22)",
-        url: "https://drive.google.com/drive/folders/16WRUGZIk1QyK60nvJw2oHyH1uNjQcL5n",
-    },
-    {
-        id: "general",
-        title: "General",
-        description: "Carpeta general con documentos compartidos.",
-        icon: "folder-google-drive",
-        color: "#2563EB",
-        soft: "rgba(37, 99, 235, 0.12)",
-        border: "rgba(37, 99, 235, 0.22)",
-        url: "https://drive.google.com/drive/folders/1N0EH_ypn7tI3sdduSBG863Su_lRDAprE",
+        id: "biblioteca",
+        title: "Biblioteca",
+        description: "Consultá recursos, referencias y material de consulta del equipo.",
+        icon: "bookshelf",
+        color: "#B7791F",
+        soft: "rgba(183, 121, 31, 0.12)",
+        border: "rgba(183, 121, 31, 0.24)",
+        url: "https://drive.google.com/drive/folders/17U_9Lu0OrxKKtZQzPx3GgmuOIq2IbYgb",
     },
 ];
 
 export default function DriveScreen() {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
+
+    const isDarkMode = !!theme.dark;
+    const custom = theme.custom || {};
+
+    const palette = useMemo(
+        () => ({
+            background: theme.colors.background,
+            surface: theme.colors.surface,
+            primary: theme.colors.primary,
+            text: theme.colors.onBackground,
+            textSecondary: custom.textSecondary || theme.colors.onSurfaceVariant,
+            textMuted: custom.textMuted || theme.colors.onSurfaceVariant,
+            border: custom.border || theme.colors.outline,
+            softBg: custom.softBg || theme.colors.surfaceVariant,
+            card: custom.card || theme.colors.surface,
+            shadow: custom.shadow || "#000000",
+        }),
+        [theme, custom]
+    );
+
+    const styles = useMemo(
+        () => createStyles(palette, isDarkMode),
+        [palette, isDarkMode]
+    );
 
     const handleOpenFolder = async (url) => {
         try {
@@ -65,7 +100,10 @@ export default function DriveScreen() {
 
     return (
         <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F4F8F1" />
+            <StatusBar
+                barStyle={isDarkMode ? "light-content" : "dark-content"}
+                backgroundColor={palette.background}
+            />
 
             <View style={styles.backgroundShapeTop} />
             <View style={styles.backgroundShapeBottom} />
@@ -94,7 +132,7 @@ export default function DriveScreen() {
                         <MaterialCommunityIcons
                             name="google-drive"
                             size={28}
-                            color={theme.colors.primary}
+                            color={palette.primary}
                         />
                     </View>
 
@@ -112,6 +150,7 @@ export default function DriveScreen() {
 
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Carpetas disponibles</Text>
+
                     <Text style={styles.sectionSubtitle}>
                         Tocá una carpeta para abrirla en Google Drive.
                     </Text>
@@ -159,7 +198,7 @@ export default function DriveScreen() {
                                         <MaterialCommunityIcons
                                             name="open-in-new"
                                             size={21}
-                                            color="#667085"
+                                            color={palette.textMuted}
                                         />
                                     </View>
                                 </Card.Content>
@@ -172,193 +211,218 @@ export default function DriveScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: {
-        flex: 1,
-        backgroundColor: "#F4F8F1",
-    },
+function createStyles(palette, isDarkMode) {
+    return StyleSheet.create({
+        screen: {
+            flex: 1,
+            backgroundColor: palette.background,
+        },
 
-    scrollContent: {
-        flexGrow: 1,
-        paddingHorizontal: 16,
-    },
+        scrollContent: {
+            flexGrow: 1,
+            paddingHorizontal: 16,
+        },
 
-    backgroundShapeTop: {
-        position: "absolute",
-        top: -120,
-        right: -70,
-        width: 240,
-        height: 240,
-        borderRadius: 120,
-        backgroundColor: "rgba(78, 122, 40, 0.08)",
-    },
+        backgroundShapeTop: {
+            position: "absolute",
+            top: -120,
+            right: -70,
+            width: 240,
+            height: 240,
+            borderRadius: 120,
+            backgroundColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.08)"
+                : "rgba(209, 107, 24, 0.07)",
+        },
 
-    backgroundShapeBottom: {
-        position: "absolute",
-        bottom: -100,
-        left: -60,
-        width: 220,
-        height: 220,
-        borderRadius: 110,
-        backgroundColor: "rgba(78, 122, 40, 0.06)",
-    },
+        backgroundShapeBottom: {
+            position: "absolute",
+            bottom: -100,
+            left: -60,
+            width: 220,
+            height: 220,
+            borderRadius: 110,
+            backgroundColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.06)"
+                : "rgba(209, 107, 24, 0.055)",
+        },
 
-    headerBlock: {
-        marginBottom: 16,
-    },
+        headerBlock: {
+            marginBottom: 16,
+        },
 
-    title: {
-        color: "#234015",
-        fontWeight: "800",
-        marginBottom: 8,
-    },
+        title: {
+            color: palette.text,
+            fontWeight: "800",
+            marginBottom: 8,
+        },
 
-    subtitle: {
-        color: "#5E6E57",
-        lineHeight: 21,
-        maxWidth: 340,
-    },
+        subtitle: {
+            color: palette.textSecondary,
+            lineHeight: 21,
+            maxWidth: 340,
+        },
 
-    infoPanel: {
-        position: "relative",
-        overflow: "hidden",
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-        backgroundColor: "rgba(255, 255, 255, 0.68)",
-        borderWidth: 1,
-        borderColor: "rgba(227, 236, 217, 0.85)",
-        borderRadius: 24,
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        marginBottom: 18,
-    },
+        infoPanel: {
+            position: "relative",
+            overflow: "hidden",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            backgroundColor: palette.card,
+            borderWidth: 1,
+            borderColor: palette.border,
+            borderRadius: 24,
+            paddingHorizontal: 16,
+            paddingVertical: 16,
+            marginBottom: 18,
+            elevation: 2,
+            shadowColor: palette.shadow,
+            shadowOpacity: isDarkMode ? 0.16 : 0.05,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
+        },
 
-    infoAccent: {
-        position: "absolute",
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: 5,
-        backgroundColor: "#4E7A28",
-        opacity: 0.75,
-    },
+        infoIconCircle: {
+            width: 58,
+            height: 58,
+            borderRadius: 22,
+            backgroundColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.11)"
+                : "rgba(209, 107, 24, 0.08)",
+            borderWidth: 1,
+            borderColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.22)"
+                : "rgba(209, 107, 24, 0.18)",
+            alignItems: "center",
+            justifyContent: "center",
+        },
 
-    infoIconCircle: {
-        width: 58,
-        height: 58,
-        borderRadius: 22,
-        backgroundColor: "#F6F9F2",
-        borderWidth: 1,
-        borderColor: "#DDEAD1",
-        alignItems: "center",
-        justifyContent: "center",
-    },
+        infoIconCircle: {
+            width: 58,
+            height: 58,
+            borderRadius: 22,
+            backgroundColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.10)"
+                : "rgba(209, 107, 24, 0.08)",
+            borderWidth: 1,
+            borderColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.20)"
+                : "rgba(209, 107, 24, 0.18)",
+            alignItems: "center",
+            justifyContent: "center",
+        },
 
-    infoTextWrap: {
-        flex: 1,
-    },
+        infoTextWrap: {
+            flex: 1,
+            backgroundColor: "transparent",
+        },
 
-    infoEyebrow: {
-        fontSize: 11.5,
-        color: "#4E7A28",
-        fontWeight: "800",
-        textTransform: "uppercase",
-        letterSpacing: 0.4,
-        marginBottom: 3,
-    },
+        infoEyebrow: {
+            fontSize: 11.5,
+            color: palette.primary,
+            fontWeight: "800",
+            textTransform: "uppercase",
+            letterSpacing: 0.4,
+            marginBottom: 3,
+        },
 
-    infoTitle: {
-        fontSize: 16,
-        fontWeight: "800",
-        color: "#1F2937",
-        marginBottom: 4,
-    },
+        infoTitle: {
+            fontSize: 16,
+            fontWeight: "800",
+            color: palette.text,
+            marginBottom: 4,
+        },
 
-    infoText: {
-        fontSize: 13,
-        color: "#667085",
-        lineHeight: 19,
-    },
+        infoText: {
+            fontSize: 13,
+            color: palette.textSecondary,
+            lineHeight: 19,
+        },
 
-    sectionHeader: {
-        marginBottom: 12,
-    },
+        sectionHeader: {
+            marginBottom: 12,
+        },
 
-    sectionTitle: {
-        fontSize: 17,
-        fontWeight: "800",
-        color: "#234015",
-        marginBottom: 3,
-    },
+        sectionTitle: {
+            fontSize: 17,
+            fontWeight: "800",
+            color: palette.text,
+            marginBottom: 3,
+        },
 
-    sectionSubtitle: {
-        fontSize: 13,
-        color: "#667085",
-    },
+        sectionSubtitle: {
+            fontSize: 13,
+            color: palette.textSecondary,
+        },
 
-    foldersList: {
-        gap: 12,
-    },
+        foldersList: {
+            gap: 12,
+        },
 
-    folderPressable: {
-        borderRadius: 22,
-    },
+        folderPressable: {
+            borderRadius: 22,
+        },
 
-    folderPressablePressed: {
-        opacity: 0.9,
-        transform: [{ scale: 0.995 }],
-    },
+        folderPressablePressed: {
+            opacity: 0.9,
+            transform: [{ scale: 0.995 }],
+        },
 
-    folderCard: {
-        borderRadius: 22,
-        backgroundColor: "#FFFFFF",
-        borderWidth: 1,
-        borderColor: "#E3ECD9",
-        elevation: 2,
-    },
+        folderCard: {
+            borderRadius: 22,
+            backgroundColor: palette.card,
+            borderWidth: 1,
+            borderColor: palette.border,
+            elevation: 2,
+            shadowColor: palette.shadow,
+            shadowOpacity: isDarkMode ? 0.18 : 0.06,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
+        },
 
-    folderContent: {
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-    },
+        folderContent: {
+            paddingHorizontal: 16,
+            paddingVertical: 16,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+        },
 
-    folderIconWrap: {
-        width: 52,
-        height: 52,
-        borderRadius: 18,
-        borderWidth: 1,
-        alignItems: "center",
-        justifyContent: "center",
-    },
+        folderIconWrap: {
+            width: 52,
+            height: 52,
+            borderRadius: 18,
+            borderWidth: 1,
+            alignItems: "center",
+            justifyContent: "center",
+        },
 
-    folderTextWrap: {
-        flex: 1,
-    },
+        folderTextWrap: {
+            flex: 1,
+        },
 
-    folderTitle: {
-        fontWeight: "800",
-        color: "#1F2937",
-        marginBottom: 4,
-    },
+        folderTitle: {
+            fontWeight: "800",
+            color: palette.text,
+            marginBottom: 4,
+        },
 
-    folderDescription: {
-        fontSize: 13,
-        color: "#667085",
-        lineHeight: 19,
-    },
+        folderDescription: {
+            fontSize: 13,
+            color: palette.textSecondary,
+            lineHeight: 19,
+        },
 
-    openIconWrap: {
-        width: 36,
-        height: 36,
-        borderRadius: 14,
-        backgroundColor: "#F8FAFC",
-        borderWidth: 1,
-        borderColor: "#ECEFF3",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-});
+        openIconWrap: {
+            width: 36,
+            height: 36,
+            borderRadius: 14,
+            backgroundColor: isDarkMode ? "rgba(255,255,255,0.035)" : "#F8F7F5",
+            borderWidth: 1,
+            borderColor: palette.border,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+    });
+}

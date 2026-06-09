@@ -1,5 +1,5 @@
 //Importaciones:
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Alert,
   Image,
@@ -15,12 +15,57 @@ import {
   Card,
   Text,
   TextInput,
+  useTheme,
 } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
 
 //JS:
 export default function LoginScreen({ navigation }) {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { login, authLoading } = useAuth();
+
+  const isDarkMode = !!theme.dark;
+  const custom = theme.custom || {};
+
+  const palette = useMemo(
+    () => ({
+      background: theme.colors.background,
+      surface: theme.colors.surface,
+      primary: theme.colors.primary,
+      text: theme.colors.onBackground,
+      textSecondary: custom.textSecondary || theme.colors.onSurfaceVariant,
+      textMuted: custom.textMuted || theme.colors.onSurfaceVariant,
+      border: custom.border || theme.colors.outline,
+      outline: custom.outline || theme.colors.outlineVariant || theme.colors.outline,
+      softBg: custom.softBg || theme.colors.surfaceVariant,
+      card: custom.card || theme.colors.surface,
+      inputBg: custom.inputBg || theme.colors.surface,
+      shadow: custom.shadow || "#000000",
+    }),
+    [theme, custom]
+  );
+
+  const styles = useMemo(
+    () => createStyles(palette, isDarkMode),
+    [palette, isDarkMode]
+  );
+
+  const inputTheme = useMemo(
+    () => ({
+      colors: {
+        primary: palette.primary,
+        outline: palette.border,
+        background: palette.inputBg,
+        onSurfaceVariant: palette.textSecondary,
+        onSurface: palette.text,
+        text: palette.text,
+        placeholder: palette.textMuted,
+      },
+    }),
+    [palette]
+  );
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,7 +88,10 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F4F8F1" />
+      <StatusBar
+        barStyle={isDarkMode ? "light-content" : "dark-content"}
+        backgroundColor={palette.background}
+      />
 
       <View style={styles.backgroundShapeTop} />
       <View style={styles.backgroundShapeBottom} />
@@ -53,7 +101,10 @@ export default function LoginScreen({ navigation }) {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24 },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           bounces={false}
@@ -62,21 +113,24 @@ export default function LoginScreen({ navigation }) {
             <Card style={styles.card}>
               <Card.Content style={styles.cardContent}>
                 <View style={styles.logoWrapper}>
-                  <View style={styles.logoCircle}>
-                    <Image
-                      source={require("../../assets/logo.png")}
-                      style={styles.logo}
-                      resizeMode="contain"
-                    />
+                  <View style={styles.logoShadow}>
+                    <View style={styles.logoCard}>
+                      <Image
+                        source={require("../../assets/logo.jpeg")}
+                        style={styles.logo}
+                        resizeMode="cover"
+                      />
+                    </View>
                   </View>
                 </View>
 
                 <Text variant="headlineMedium" style={styles.title}>
-                  Cannabis ConCiencia
+                  QAZA
                 </Text>
 
                 <Text variant="bodyMedium" style={styles.subtitle}>
-                  Iniciá sesión para organizar las tareas del equipo
+                  Iniciá sesión para organizar tareas, notas, objetivos y recursos
+                  del equipo.
                 </Text>
 
                 <View style={styles.form}>
@@ -91,13 +145,8 @@ export default function LoginScreen({ navigation }) {
                     outlineStyle={styles.inputOutline}
                     contentStyle={styles.inputContent}
                     left={<TextInput.Icon icon="email-outline" />}
-                    theme={{
-                      colors: {
-                        primary: "#4E7A28",
-                        outline: "#C9D8BF",
-                        background: "#FFFFFF",
-                      },
-                    }}
+                    textColor={palette.text}
+                    theme={inputTheme}
                   />
 
                   <TextInput
@@ -110,13 +159,8 @@ export default function LoginScreen({ navigation }) {
                     outlineStyle={styles.inputOutline}
                     contentStyle={styles.inputContent}
                     left={<TextInput.Icon icon="lock-outline" />}
-                    theme={{
-                      colors: {
-                        primary: "#4E7A28",
-                        outline: "#C9D8BF",
-                        background: "#FFFFFF",
-                      },
-                    }}
+                    textColor={palette.text}
+                    theme={inputTheme}
                   />
 
                   <Button
@@ -126,8 +170,10 @@ export default function LoginScreen({ navigation }) {
                     disabled={authLoading}
                     style={styles.loginButton}
                     contentStyle={styles.loginButtonContent}
-                    buttonColor="#4E7A28"
+                    buttonColor={palette.primary}
+                    textColor="#FFFFFF"
                     labelStyle={styles.loginButtonLabel}
+                    icon="login"
                   >
                     Ingresar
                   </Button>
@@ -136,12 +182,20 @@ export default function LoginScreen({ navigation }) {
                     mode="text"
                     onPress={() => navigation.navigate("Register")}
                     disabled={authLoading}
-                    textColor="#4E7A28"
+                    textColor={palette.textSecondary}
                     style={styles.registerButton}
                     labelStyle={styles.registerButtonLabel}
                   >
                     Crear cuenta
                   </Button>
+                </View>
+
+                <View style={styles.footerPill}>
+                  <View style={styles.statusDot} />
+
+                  <Text style={styles.footerText}>
+                    Espacio de trabajo interno
+                  </Text>
                 </View>
               </Card.Content>
             </Card>
@@ -167,135 +221,195 @@ function getFirebaseErrorMessage(error) {
   }
 }
 
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
+function createStyles(palette, isDarkMode) {
+  return StyleSheet.create({
+    flex: {
+      flex: 1,
+    },
 
-  screen: {
-    flex: 1,
-    backgroundColor: "#F4F8F1",
-  },
+    screen: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
 
-  scrollContent: {
-    flexGrow: 1,
-  },
+    scrollContent: {
+      flexGrow: 1,
+    },
 
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 22,
-    paddingVertical: 24,
-  },
+    container: {
+      flex: 1,
+      justifyContent: "center",
+      paddingHorizontal: 22,
+      paddingVertical: 24,
+    },
 
-  backgroundShapeTop: {
-    position: "absolute",
-    top: -120,
-    right: -70,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: "rgba(78, 122, 40, 0.08)",
-  },
+    backgroundShapeTop: {
+      position: "absolute",
+      top: -120,
+      right: -70,
+      width: 240,
+      height: 240,
+      borderRadius: 120,
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.08)"
+        : "rgba(209, 107, 24, 0.06)",
+    },
 
-  backgroundShapeBottom: {
-    position: "absolute",
-    bottom: -100,
-    left: -60,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "rgba(78, 122, 40, 0.06)",
-  },
+    backgroundShapeBottom: {
+      position: "absolute",
+      bottom: -100,
+      left: -60,
+      width: 220,
+      height: 220,
+      borderRadius: 110,
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.055)"
+        : "rgba(209, 107, 24, 0.045)",
+    },
 
-  card: {
-    borderRadius: 28,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    elevation: 3,
-  },
+    card: {
+      borderRadius: 30,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+      elevation: 3,
+      shadowColor: palette.shadow,
+      shadowOpacity: isDarkMode ? 0.2 : 0.08,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 8 },
+    },
 
-  cardContent: {
-    paddingHorizontal: 22,
-    paddingTop: 28,
-    paddingBottom: 18,
-  },
+    cardContent: {
+      paddingHorizontal: 24,
+      paddingTop: 30,
+      paddingBottom: 22,
+    },
 
-  logoWrapper: {
-    alignItems: "center",
-    marginBottom: 18,
-  },
+    logoWrapper: {
+      alignItems: "center",
+      marginBottom: 20,
+    },
 
-  logoCircle: {
-    width: 118,
-    height: 118,
-    borderRadius: 59,
-    backgroundColor: "#F7FAF4",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-  },
+    logoShadow: {
+      width: 132,
+      height: 132,
+      borderRadius: 34,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: isDarkMode
+        ? "rgba(255,255,255,0.035)"
+        : "#FAF8F5",
+      borderWidth: 1,
+      borderColor: palette.border,
+      shadowColor: palette.shadow,
+      shadowOpacity: isDarkMode ? 0.24 : 0.1,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3,
+    },
 
-  logo: {
-    width: 94,
-    height: 94,
-  },
+    logoCard: {
+      width: 104,
+      height: 104,
+      borderRadius: 26,
+      overflow: "hidden",
+      backgroundColor: palette.primary,
+    },
 
-  title: {
-    textAlign: "center",
-    color: "#234015",
-    fontWeight: "800",
-    marginBottom: 8,
-  },
+    logo: {
+      width: "100%",
+      height: "100%",
+      borderRadius: 26,
+    },
 
-  subtitle: {
-    textAlign: "center",
-    color: "#5E6E57",
-    lineHeight: 22,
-    marginBottom: 26,
-    paddingHorizontal: 6,
-  },
+    title: {
+      textAlign: "center",
+      color: palette.text,
+      fontWeight: "900",
+      fontSize: 30,
+      lineHeight: 36,
+      marginBottom: 10,
+    },
 
-  form: {
-    marginTop: 4,
-  },
+    subtitle: {
+      textAlign: "center",
+      color: palette.textSecondary,
+      lineHeight: 23,
+      fontSize: 15,
+      marginBottom: 28,
+      paddingHorizontal: 4,
+    },
 
-  input: {
-    marginBottom: 14,
-    backgroundColor: "#FFFFFF",
-  },
+    form: {
+      marginTop: 2,
+    },
 
-  inputOutline: {
-    borderRadius: 16,
-  },
+    input: {
+      marginBottom: 14,
+      backgroundColor: palette.inputBg,
+    },
 
-  inputContent: {
-    paddingVertical: 4,
-  },
+    inputOutline: {
+      borderRadius: 17,
+    },
 
-  loginButton: {
-    marginTop: 8,
-    borderRadius: 16,
-  },
+    inputContent: {
+      minHeight: 56,
+      color: palette.text,
+      fontSize: 15,
+    },
 
-  loginButtonContent: {
-    height: 52,
-  },
+    loginButton: {
+      marginTop: 8,
+      borderRadius: 17,
+    },
 
-  loginButtonLabel: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
+    loginButtonContent: {
+      height: 54,
+    },
 
-  registerButton: {
-    marginTop: 8,
-    alignSelf: "center",
-  },
+    loginButtonLabel: {
+      fontSize: 16,
+      fontWeight: "800",
+    },
 
-  registerButtonLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-});
+    registerButton: {
+      marginTop: 10,
+      alignSelf: "center",
+    },
+
+    registerButtonLabel: {
+      fontSize: 14,
+      fontWeight: "800",
+    },
+
+    footerPill: {
+      alignSelf: "center",
+      marginTop: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 7,
+      backgroundColor: isDarkMode
+        ? "rgba(255,255,255,0.03)"
+        : "rgba(250,248,245,0.9)",
+      borderWidth: 1,
+      borderColor: palette.border,
+      paddingHorizontal: 13,
+      paddingVertical: 8,
+      borderRadius: 999,
+    },
+
+    statusDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: palette.primary,
+    },
+
+    footerText: {
+      fontSize: 12,
+      color: palette.textSecondary,
+      fontWeight: "800",
+    },
+  });
+}
