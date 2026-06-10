@@ -339,7 +339,13 @@ function getWeekDays(date) {
     });
 }
 
-function CalendarTaskPreview({ task, variant = "month", isPastDay = false }) {
+function CalendarTaskPreview({
+    task,
+    variant = "month",
+    isPastDay = false,
+    styles,
+    palette,
+}) {
     const category = getNoteCategoryByKey(task.categoryKey);
     const names = getTaskResponsibleNames(task);
     const visibleNames = names.slice(0, variant === "week" ? 4 : 3);
@@ -387,7 +393,7 @@ function CalendarTaskPreview({ task, variant = "month", isPastDay = false }) {
                                 ? styles.weekTaskInitial
                                 : styles.monthTaskInitial,
                             {
-                                backgroundColor: "#475467",
+                                backgroundColor: palette.textMuted,
                             },
                         ]}
                     >
@@ -408,7 +414,7 @@ function CalendarTaskPreview({ task, variant = "month", isPastDay = false }) {
                 style={[
                     variant === "week" ? styles.weekTaskTitle : styles.monthTaskTitle,
                     {
-                        color: isPastDay ? "#475467" : category.color,
+                        color: isPastDay ? palette.textSecondary : category.color,
                     },
                 ]}
                 numberOfLines={variant === "week" ? 2 : 1}
@@ -429,6 +435,8 @@ function MonthDayCell({
     onPressDay,
     dayCellWidth,
     dayCellHeight,
+    styles,
+    palette,
 }) {
     const dateKey = toDateKey(date);
     const dayTasks = tasksByDate[dateKey] || [];
@@ -480,6 +488,8 @@ function MonthDayCell({
                         task={task}
                         variant="month"
                         isPastDay={isPastDay}
+                        styles={styles}
+                        palette={palette}
                     />
                 ))}
 
@@ -512,6 +522,8 @@ function WeekDayColumn({
     tasksByDate,
     onPressDay,
     dayColumnWidth,
+    styles,
+    palette,
 }) {
     const dateKey = toDateKey(date);
     const dayTasks = tasksByDate[dateKey] || [];
@@ -558,6 +570,8 @@ function WeekDayColumn({
                             task={task}
                             variant="week"
                             isPastDay={isPastDay}
+                            styles={styles}
+                            palette={palette}
                         />
                     ))
                 ) : (
@@ -573,6 +587,34 @@ export default function CalendarScreen({ navigation }) {
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
     const { user } = useAuth();
+
+    const isDarkMode = !!theme.dark;
+    const custom = theme.custom || {};
+
+    const palette = useMemo(
+        () => ({
+            background: theme.colors.background,
+            surface: theme.colors.surface,
+            primary: theme.colors.primary,
+            text: theme.colors.onBackground,
+            textSecondary: custom.textSecondary || theme.colors.onSurfaceVariant,
+            textMuted: custom.textMuted || theme.colors.onSurfaceVariant,
+            border: custom.border || theme.colors.outline,
+            outline: custom.outline || theme.colors.outlineVariant || theme.colors.outline,
+            softBg: custom.softBg || theme.colors.surfaceVariant,
+            card: custom.card || theme.colors.surface,
+            danger: custom.danger || theme.colors.error || "#B42318",
+            success: custom.success || "#2E7D32",
+            warning: custom.warning || "#B7791F",
+            shadow: custom.shadow || "#000000",
+        }),
+        [theme, custom]
+    );
+
+    const styles = useMemo(
+        () => createStyles(palette, isDarkMode),
+        [palette, isDarkMode]
+    );
 
     const todayKey = useMemo(() => toDateKey(new Date()), []);
 
@@ -836,8 +878,7 @@ export default function CalendarScreen({ navigation }) {
             setPinningTaskId(null);
         }
     };
-
-    const handleAskDeleteTask = (task) => {
+        const handleAskDeleteTask = (task) => {
         if (!task?.id) return;
 
         setTaskToDelete(task);
@@ -967,7 +1008,7 @@ export default function CalendarScreen({ navigation }) {
                                     style={[
                                         styles.taskAvatar,
                                         {
-                                            backgroundColor: "#667085",
+                                            backgroundColor: palette.textMuted,
                                             marginLeft: -8,
                                         },
                                     ]}
@@ -996,9 +1037,13 @@ export default function CalendarScreen({ navigation }) {
                                 mode="contained-tonal"
                                 loading={isPinning}
                                 disabled={isPinning || isDeleting}
-                                iconColor={task.isPinned ? "#B7791F" : "#98A2B3"}
+                                iconColor={task.isPinned ? palette.warning : palette.textMuted}
                                 containerColor={
-                                    task.isPinned ? "rgba(245,158,11,0.16)" : "#F8FAFC"
+                                    task.isPinned
+                                        ? "rgba(245,158,11,0.16)"
+                                        : isDarkMode
+                                        ? "rgba(255,255,255,0.035)"
+                                        : "#F8FAFC"
                                 }
                                 style={styles.priorityActionButton}
                                 onPress={() => handleTogglePinned(task)}
@@ -1010,7 +1055,7 @@ export default function CalendarScreen({ navigation }) {
                                         <MaterialCommunityIcons
                                             name="drag"
                                             size={19}
-                                            color="#98A2B3"
+                                            color={palette.textMuted}
                                         />
                                     </View>
                                 </Pressable>
@@ -1063,6 +1108,7 @@ export default function CalendarScreen({ navigation }) {
                                 size={13}
                                 color={statusMeta.color}
                             />
+
                             <Text
                                 style={[
                                     styles.smallChipText,
@@ -1085,8 +1131,9 @@ export default function CalendarScreen({ navigation }) {
                             <MaterialCommunityIcons
                                 name="account-edit-outline"
                                 size={15}
-                                color="#667085"
+                                color={palette.textMuted}
                             />
+
                             <Text style={styles.modalMetaText}>
                                 Creada por{" "}
                                 <Text style={styles.modalMetaStrong}>
@@ -1099,8 +1146,9 @@ export default function CalendarScreen({ navigation }) {
                             <MaterialCommunityIcons
                                 name="calendar-month-outline"
                                 size={15}
-                                color="#667085"
+                                color={palette.textMuted}
                             />
+
                             <Text style={styles.modalMetaText}>
                                 Fecha{" "}
                                 <Text style={styles.modalMetaStrong}>
@@ -1124,6 +1172,7 @@ export default function CalendarScreen({ navigation }) {
                                 size={16}
                                 color="#2563EB"
                             />
+
                             <Text style={[styles.secondaryActionText, { color: "#2563EB" }]}>
                                 Editar
                             </Text>
@@ -1140,15 +1189,21 @@ export default function CalendarScreen({ navigation }) {
                             ]}
                         >
                             {isDeleting ? (
-                                <ActivityIndicator size={14} color="#B42318" />
+                                <ActivityIndicator size={14} color={palette.danger} />
                             ) : (
                                 <MaterialCommunityIcons
                                     name="trash-can-outline"
                                     size={16}
-                                    color="#B42318"
+                                    color={palette.danger}
                                 />
                             )}
-                            <Text style={[styles.secondaryActionText, { color: "#B42318" }]}>
+
+                            <Text
+                                style={[
+                                    styles.secondaryActionText,
+                                    { color: palette.danger },
+                                ]}
+                            >
                                 Eliminar
                             </Text>
                         </Pressable>
@@ -1161,7 +1216,7 @@ export default function CalendarScreen({ navigation }) {
                         disabled={isUpdating || isDeleting}
                         style={styles.toggleTaskButton}
                         contentStyle={styles.toggleTaskButtonContent}
-                        buttonColor={theme.colors.primary}
+                        buttonColor={palette.primary}
                         textColor="#FFFFFF"
                         icon="check"
                     >
@@ -1178,12 +1233,15 @@ export default function CalendarScreen({ navigation }) {
                 style={[
                     styles.container,
                     {
-                        backgroundColor: "#F4F8F1",
+                        backgroundColor: palette.background,
                         paddingTop: insets.top + 6,
                     },
                 ]}
             >
-                <StatusBar barStyle="dark-content" backgroundColor="#F4F8F1" />
+                <StatusBar
+                    barStyle={isDarkMode ? "light-content" : "dark-content"}
+                    backgroundColor={palette.background}
+                />
 
                 <View style={styles.backgroundOrbTop} />
                 <View style={styles.backgroundOrbBottom} />
@@ -1213,7 +1271,7 @@ export default function CalendarScreen({ navigation }) {
                                         <MaterialCommunityIcons
                                             name="filter-variant"
                                             size={15}
-                                            color={theme.colors.primary}
+                                            color={palette.primary}
                                         />
                                     </View>
 
@@ -1254,7 +1312,7 @@ export default function CalendarScreen({ navigation }) {
                                     textStyle={[
                                         styles.filterChipText,
                                         ownerFilter === "mine" && {
-                                            color: theme.colors.primary,
+                                            color: palette.primary,
                                             fontWeight: "800",
                                         },
                                     ]}
@@ -1262,7 +1320,11 @@ export default function CalendarScreen({ navigation }) {
                                         <MaterialCommunityIcons
                                             name="account-check-outline"
                                             size={14}
-                                            color={ownerFilter === "mine" ? theme.colors.primary : "#667085"}
+                                            color={
+                                                ownerFilter === "mine"
+                                                    ? palette.primary
+                                                    : palette.textMuted
+                                            }
                                         />
                                     )}
                                 >
@@ -1281,7 +1343,7 @@ export default function CalendarScreen({ navigation }) {
                                     textStyle={[
                                         styles.filterChipText,
                                         ownerFilter === "others" && {
-                                            color: theme.colors.primary,
+                                            color: palette.primary,
                                             fontWeight: "800",
                                         },
                                     ]}
@@ -1290,7 +1352,9 @@ export default function CalendarScreen({ navigation }) {
                                             name="account-group-outline"
                                             size={14}
                                             color={
-                                                ownerFilter === "others" ? theme.colors.primary : "#667085"
+                                                ownerFilter === "others"
+                                                    ? palette.primary
+                                                    : palette.textMuted
                                             }
                                         />
                                     )}
@@ -1321,7 +1385,11 @@ export default function CalendarScreen({ navigation }) {
                                         <MaterialCommunityIcons
                                             name={selectedCategory?.icon || "shape-outline"}
                                             size={14}
-                                            color={categoryFilter ? selectedCategory?.color : "#667085"}
+                                            color={
+                                                categoryFilter
+                                                    ? selectedCategory?.color
+                                                    : palette.textMuted
+                                            }
                                         />
                                     )}
                                 >
@@ -1337,7 +1405,7 @@ export default function CalendarScreen({ navigation }) {
                                 <IconButton
                                     icon="chevron-left"
                                     size={22}
-                                    iconColor={theme.colors.primary}
+                                    iconColor={palette.primary}
                                     onPress={
                                         calendarViewMode === CALENDAR_VIEW_MODES.MONTH
                                             ? handlePreviousMonth
@@ -1363,7 +1431,7 @@ export default function CalendarScreen({ navigation }) {
                                 <IconButton
                                     icon="chevron-right"
                                     size={22}
-                                    iconColor={theme.colors.primary}
+                                    iconColor={palette.primary}
                                     onPress={
                                         calendarViewMode === CALENDAR_VIEW_MODES.MONTH
                                             ? handleNextMonth
@@ -1375,7 +1443,9 @@ export default function CalendarScreen({ navigation }) {
 
                             <View style={styles.viewModeSwitch}>
                                 <Pressable
-                                    onPress={() => handleChangeCalendarViewMode(CALENDAR_VIEW_MODES.MONTH)}
+                                    onPress={() =>
+                                        handleChangeCalendarViewMode(CALENDAR_VIEW_MODES.MONTH)
+                                    }
                                     style={[
                                         styles.viewModeOption,
                                         calendarViewMode === CALENDAR_VIEW_MODES.MONTH &&
@@ -1388,9 +1458,10 @@ export default function CalendarScreen({ navigation }) {
                                         color={
                                             calendarViewMode === CALENDAR_VIEW_MODES.MONTH
                                                 ? "#FFFFFF"
-                                                : theme.colors.primary
+                                                : palette.primary
                                         }
                                     />
+
                                     <Text
                                         style={[
                                             styles.viewModeText,
@@ -1403,7 +1474,9 @@ export default function CalendarScreen({ navigation }) {
                                 </Pressable>
 
                                 <Pressable
-                                    onPress={() => handleChangeCalendarViewMode(CALENDAR_VIEW_MODES.WEEK)}
+                                    onPress={() =>
+                                        handleChangeCalendarViewMode(CALENDAR_VIEW_MODES.WEEK)
+                                    }
                                     style={[
                                         styles.viewModeOption,
                                         calendarViewMode === CALENDAR_VIEW_MODES.WEEK &&
@@ -1416,9 +1489,10 @@ export default function CalendarScreen({ navigation }) {
                                         color={
                                             calendarViewMode === CALENDAR_VIEW_MODES.WEEK
                                                 ? "#FFFFFF"
-                                                : theme.colors.primary
+                                                : palette.primary
                                         }
                                     />
+
                                     <Text
                                         style={[
                                             styles.viewModeText,
@@ -1433,7 +1507,8 @@ export default function CalendarScreen({ navigation }) {
 
                             {loading ? (
                                 <View style={styles.loadingBox}>
-                                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                                    <ActivityIndicator size="small" color={palette.primary} />
+
                                     <Text style={styles.loadingText}>Cargando tareas...</Text>
                                 </View>
                             ) : calendarViewMode === CALENDAR_VIEW_MODES.MONTH ? (
@@ -1465,6 +1540,8 @@ export default function CalendarScreen({ navigation }) {
                                                     onPressDay={handleDayPress}
                                                     dayCellWidth={dayCellWidth}
                                                     dayCellHeight={dayCellHeight}
+                                                    styles={styles}
+                                                    palette={palette}
                                                 />
                                             ))}
                                         </View>
@@ -1503,6 +1580,8 @@ export default function CalendarScreen({ navigation }) {
                                                     tasksByDate={tasksByDate}
                                                     onPressDay={handleDayPress}
                                                     dayColumnWidth={weekColumnWidth}
+                                                    styles={styles}
+                                                    palette={palette}
                                                 />
                                             ))}
                                         </View>
@@ -1540,8 +1619,12 @@ export default function CalendarScreen({ navigation }) {
                                         style={({ pressed }) => [
                                             styles.categoryOption,
                                             {
-                                                backgroundColor: selected ? item.soft : "#FFFFFF",
-                                                borderColor: selected ? item.border : "#ECEFF3",
+                                                backgroundColor: selected
+                                                    ? item.soft
+                                                    : isDarkMode
+                                                    ? "rgba(255,255,255,0.025)"
+                                                    : "#FFFFFF",
+                                                borderColor: selected ? item.border : palette.border,
                                             },
                                             pressed && styles.categoryOptionPressed,
                                         ]}
@@ -1591,13 +1674,16 @@ export default function CalendarScreen({ navigation }) {
                                     setCategoryFilter(null);
                                     setCategoryDialogVisible(false);
                                 }}
-                                textColor="#667085"
+                                textColor={palette.textSecondary}
                             >
                                 Quitar filtro
                             </Button>
                         ) : null}
 
-                        <Button onPress={() => setCategoryDialogVisible(false)}>
+                        <Button
+                            onPress={() => setCategoryDialogVisible(false)}
+                            textColor={palette.primary}
+                        >
                             Cerrar
                         </Button>
                     </Dialog.Actions>
@@ -1614,7 +1700,12 @@ export default function CalendarScreen({ navigation }) {
 
                     {selectedTasks.length > 1 ? (
                         <View style={styles.reorderHintBox}>
-                            <MaterialCommunityIcons name="gesture-tap-hold" size={15} color="#667085" />
+                            <MaterialCommunityIcons
+                                name="gesture-tap-hold"
+                                size={15}
+                                color={palette.textMuted}
+                            />
+
                             <Text style={styles.reorderHintText}>
                                 Mantené presionada una tarea y arrastrala para ordenar la prioridad del día.
                             </Text>
@@ -1636,8 +1727,11 @@ export default function CalendarScreen({ navigation }) {
                                 ListFooterComponent={
                                     reordering ? (
                                         <View style={styles.reorderingBox}>
-                                            <ActivityIndicator size="small" color={theme.colors.primary} />
-                                            <Text style={styles.reorderingText}>Guardando orden...</Text>
+                                            <ActivityIndicator size="small" color={palette.primary} />
+
+                                            <Text style={styles.reorderingText}>
+                                                Guardando orden...
+                                            </Text>
                                         </View>
                                     ) : null
                                 }
@@ -1653,7 +1747,7 @@ export default function CalendarScreen({ navigation }) {
                                         <MaterialCommunityIcons
                                             name="calendar-plus"
                                             size={30}
-                                            color={theme.colors.primary}
+                                            color={palette.primary}
                                         />
                                     </View>
 
@@ -1668,13 +1762,12 @@ export default function CalendarScreen({ navigation }) {
                             </ScrollView>
                         )}
                     </Dialog.ScrollArea>
-
-                    <Dialog.Actions style={styles.modalActionsRow}>
+                                        <Dialog.Actions style={styles.modalActionsRow}>
                         <Button
                             mode="text"
                             compact
                             onPress={() => setDialogVisible(false)}
-                            textColor="#667085"
+                            textColor={palette.textSecondary}
                             style={styles.modalSmallButton}
                             labelStyle={styles.modalSmallButtonLabel}
                         >
@@ -1685,7 +1778,7 @@ export default function CalendarScreen({ navigation }) {
                             mode="outlined"
                             compact
                             onPress={handleCreateTaskForSelectedDate}
-                            textColor={theme.colors.primary}
+                            textColor={palette.primary}
                             style={styles.modalSmallButton}
                             labelStyle={styles.modalSmallButtonLabel}
                             icon="plus"
@@ -1727,7 +1820,7 @@ export default function CalendarScreen({ navigation }) {
                                 onPress={handleCloseDeleteDialog}
                                 disabled={!!deletingTaskId}
                                 style={styles.cancelDeleteButton}
-                                textColor="#667085"
+                                textColor={palette.textSecondary}
                             >
                                 Cancelar
                             </Button>
@@ -1738,7 +1831,8 @@ export default function CalendarScreen({ navigation }) {
                                 loading={!!deletingTaskId}
                                 disabled={!!deletingTaskId}
                                 style={styles.confirmDeleteButton}
-                                buttonColor="#B42318"
+                                buttonColor={palette.danger}
+                                textColor="#FFFFFF"
                                 icon="trash-can-outline"
                             >
                                 Eliminar
@@ -1751,985 +1845,1017 @@ export default function CalendarScreen({ navigation }) {
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        paddingHorizontal: 2,
-    },
-
-    scrollContent: {
-        flexGrow: 1,
-    },
-
-    backgroundOrbTop: {
-        position: "absolute",
-        top: -130,
-        right: -70,
-        width: 250,
-        height: 250,
-        borderRadius: 125,
-        backgroundColor: "rgba(78,122,40,0.08)",
-    },
-
-    backgroundOrbBottom: {
-        position: "absolute",
-        bottom: -120,
-        left: -80,
-        width: 240,
-        height: 240,
-        borderRadius: 120,
-        backgroundColor: "rgba(78,122,40,0.05)",
-    },
-
-    header: {
-        paddingHorizontal: 10,
-        marginBottom: 12,
-    },
-
-    title: {
-        fontWeight: "800",
-        color: "#234015",
-        marginBottom: 8,
-    },
-
-    subtitle: {
-        color: "#5E6E57",
-        lineHeight: 21,
-        maxWidth: 340,
-    },
-
-    filtersCard: {
-        borderRadius: 20,
-        backgroundColor: "#FFFFFF",
-        borderWidth: 1,
-        borderColor: "#E3ECD9",
-        elevation: 1,
-        marginHorizontal: 6,
-        marginBottom: 10,
-    },
-
-    filtersContent: {
-        paddingHorizontal: 12,
-        paddingTop: 11,
-        paddingBottom: 11,
-    },
-
-    filtersTopRow: {
-        height: 28,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        marginBottom: 9,
-        overflow: "hidden",
-    },
-
-    filtersTitleRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 7,
-        flex: 1,
-    },
-
-    filtersIconWrap: {
-        width: 27,
-        height: 27,
-        borderRadius: 10,
-        backgroundColor: "#F6F9F2",
-        borderWidth: 1,
-        borderColor: "#E3ECD9",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    filtersTitle: {
-        fontSize: 13.5,
-        fontWeight: "800",
-        color: "#344054",
-    },
-
-    clearFiltersPressable: {
-        width: 64,
-        height: 28,
-        alignItems: "flex-end",
-        justifyContent: "center",
-        overflow: "hidden",
-    },
-
-    clearFiltersText: {
-        fontSize: 12,
-        fontWeight: "800",
-        color: "#667085",
-    },
-
-    clearFiltersTextHidden: {
-        opacity: 0,
-    },
-
-    filtersScrollContent: {
-        gap: 8,
-        paddingRight: 4,
-    },
-
-    filterChip: {
-        backgroundColor: "#FFFFFF",
-        borderWidth: 1,
-        borderColor: "#E5E7EB",
-    },
-
-    filterChipSelected: {
-        backgroundColor: "rgba(78,122,40,0.10)",
-        borderColor: "rgba(78,122,40,0.25)",
-    },
-
-    filterChipText: {
-        fontSize: 12,
-        color: "#667085",
-        fontWeight: "700",
-    },
-
-    calendarCard: {
-        borderRadius: 22,
-        backgroundColor: "#FFFFFF",
-        borderWidth: 1,
-        borderColor: "#E3ECD9",
-        elevation: 3,
-        marginHorizontal: 0,
-        marginBottom: 14,
-        overflow: "hidden",
-    },
-
-    calendarContent: {
-        paddingTop: 10,
-        paddingBottom: 6,
-        paddingHorizontal: 0,
-    },
-
-    calendarHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 8,
-        marginBottom: 8,
-    },
-
-    calendarArrowButton: {
-        margin: 0,
-        width: 38,
-        height: 38,
-        borderRadius: 14,
-    },
-
-    calendarTitleWrap: {
-        alignItems: "center",
-        flex: 1,
-    },
-
-    calendarTitle: {
-        fontSize: 19,
-        fontWeight: "900",
-        color: "#234015",
-        textTransform: "capitalize",
-    },
-
-    calendarSubtitle: {
-        marginTop: 2,
-        fontSize: 11.5,
-        fontWeight: "700",
-        color: "#667085",
-    },
-
-    viewModeSwitch: {
-        flexDirection: "row",
-        backgroundColor: "#F6F9F2",
-        borderWidth: 1,
-        borderColor: "#E3ECD9",
-        borderRadius: 16,
-        padding: 4,
-        marginHorizontal: 12,
-        marginBottom: 10,
-        gap: 4,
-    },
-
-    viewModeOption: {
-        flex: 1,
-        height: 34,
-        borderRadius: 12,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-    },
-
-    viewModeOptionActive: {
-        backgroundColor: "#4E7A28",
-    },
-
-    viewModeText: {
-        fontSize: 12.5,
-        fontWeight: "800",
-        color: "#4E7A28",
-    },
-
-    viewModeTextActive: {
-        color: "#FFFFFF",
-    },
-
-    loadingBox: {
-        paddingVertical: 34,
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 10,
-    },
-
-    loadingText: {
-        color: "#667085",
-        fontWeight: "600",
-    },
-
-    monthCalendar: {
-        width: "100%",
-    },
-
-    weekHeaderRow: {
-        flexDirection: "row",
-        alignItems: "center",
-    },
-
-    weekHeaderCell: {
-        height: 24,
-        alignItems: "center",
-        justifyContent: "center",
-        borderBottomWidth: 1,
-        borderBottomColor: "#E3ECD9",
-    },
-
-    weekHeaderText: {
-        fontSize: 11,
-        fontWeight: "900",
-        color: "#667085",
-    },
-
-    monthWeekRow: {
-        flexDirection: "row",
-        alignItems: "stretch",
-    },
-
-    monthDayCell: {
-        borderWidth: 0.5,
-        borderColor: "#E3ECD9",
-        paddingHorizontal: 1,
-        paddingTop: 2,
-        paddingBottom: 2,
-        overflow: "hidden",
-        backgroundColor: "#FFFFFF",
-    },
-
-    monthDayCellPast: {
-        backgroundColor: "#EEF2EC",
-        borderColor: "#D1D8CE",
-    },
-
-    monthDayCellSelected: {
-        backgroundColor: "rgba(78,122,40,0.10)",
-    },
-
-    monthDayCellToday: {
-        borderColor: "#4E7A28",
-        borderWidth: 2,
-    },
-
-    monthDayCellPressed: {
-        opacity: 0.86,
-    },
-
-    monthDayNumber: {
-        fontSize: 11,
-        fontWeight: "900",
-        color: "#1F2937",
-        textAlign: "center",
-        marginBottom: 2,
-    },
-
-    monthDayNumberPast: {
-        color: "#475467",
-    },
-
-    monthDayNumberDisabled: {
-        color: "#AAB2BE",
-    },
-
-    monthDayNumberToday: {
-        color: "#FFFFFF",
-        backgroundColor: "#4E7A28",
-        paddingHorizontal: 6,
-        paddingVertical: 1,
-        borderRadius: 999,
-        overflow: "hidden",
-    },
-
-    dayPinnedBadge: {
-        position: "absolute",
-        top: 1,
-        right: 1,
-        width: 16,
-        height: 16,
-        borderRadius: 999,
-        backgroundColor: "#F59E0B",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 5,
-        borderWidth: 1.5,
-        borderColor: "#FFFFFF",
-    },
-
-    monthTasksWrap: {
-        flex: 1,
-        gap: 2,
-    },
-
-    monthTaskCard: {
-        borderWidth: 1,
-        borderRadius: 8,
-        minHeight: 29,
-        paddingHorizontal: 1,
-        paddingVertical: 2,
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-    },
-
-    taskPreviewInitialsRow: {
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
-        marginBottom: 1,
-    },
-
-    monthTaskInitial: {
-        width: 14,
-        height: 14,
-        borderRadius: 999,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.85)",
-        marginHorizontal: -1,
-    },
-
-    monthTaskInitialText: {
-        fontSize: 7.5,
-        fontWeight: "900",
-        color: "#FFFFFF",
-        lineHeight: 9,
-    },
-
-    monthTaskTitle: {
-        width: "100%",
-        textAlign: "center",
-        fontSize: 7.8,
-        fontWeight: "900",
-        lineHeight: 8.5,
-    },
-
-    monthMoreBadge: {
-        alignSelf: "center",
-        minWidth: 27,
-        height: 14,
-        borderRadius: 999,
-        backgroundColor: "#F8FAFC",
-        borderWidth: 1,
-        borderColor: "#ECEFF3",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 5,
-        marginTop: 1,
-    },
-
-    monthMoreBadgePast: {
-        backgroundColor: "#E2E8F0",
-        borderColor: "#CBD5E1",
-    },
-
-    monthMoreText: {
-        fontSize: 8,
-        fontWeight: "900",
-        color: "#667085",
-        lineHeight: 9,
-    },
-
-    monthMoreTextPast: {
-        color: "#475467",
-    },
-
-    weekCalendarScrollContent: {
-        paddingHorizontal: 0,
-    },
-
-    weekCalendar: {
-        minWidth: "100%",
-    },
-
-    weekColumnsRow: {
-        flexDirection: "row",
-        alignItems: "stretch",
-    },
-
-    weekDayColumn: {
-        minHeight: 390,
-        borderWidth: 0.5,
-        borderColor: "#E3ECD9",
-        backgroundColor: "#FFFFFF",
-        paddingHorizontal: 2,
-        paddingTop: 3,
-        paddingBottom: 4,
-        overflow: "visible",
-    },
-
-    weekDayColumnPast: {
-        backgroundColor: "#EEF2EC",
-        borderColor: "#D1D8CE",
-    },
-
-    weekDayColumnSelected: {
-        backgroundColor: "rgba(78,122,40,0.08)",
-    },
-
-    weekDayColumnToday: {
-        borderColor: "#4E7A28",
-        borderWidth: 2,
-    },
-
-    weekDayColumnPressed: {
-        opacity: 0.88,
-    },
-
-    weekPinnedBadge: {
-        position: "absolute",
-        top: 2,
-        right: 2,
-        width: 16,
-        height: 16,
-        borderRadius: 999,
-        backgroundColor: "#F59E0B",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 5,
-        borderWidth: 1.5,
-        borderColor: "#FFFFFF",
-    },
-
-    weekDayNumber: {
-        fontSize: 13,
-        fontWeight: "900",
-        color: "#1F2937",
-        textAlign: "center",
-        marginBottom: 4,
-    },
-
-    weekDayNumberPast: {
-        color: "#475467",
-    },
-
-    weekDayNumberToday: {
-        color: "#FFFFFF",
-        backgroundColor: "#4E7A28",
-        paddingHorizontal: 7,
-        paddingVertical: 2,
-        borderRadius: 999,
-        overflow: "hidden",
-    },
-
-    weekTasksWrap: {
-        gap: 5,
-    },
-
-    weekTaskCard: {
-        borderWidth: 1,
-        borderRadius: 10,
-        minHeight: 54,
-        paddingHorizontal: 3,
-        paddingVertical: 5,
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-    },
-
-    weekTaskInitial: {
-        width: 18,
-        height: 18,
-        borderRadius: 999,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.85)",
-        marginHorizontal: -1,
-    },
-
-    weekTaskInitialText: {
-        fontSize: 8.5,
-        fontWeight: "900",
-        color: "#FFFFFF",
-        lineHeight: 10,
-    },
-
-    weekTaskTitle: {
-        width: "100%",
-        textAlign: "center",
-        fontSize: 9,
-        fontWeight: "900",
-        lineHeight: 11,
-    },
-
-    weekEmptySpace: {
-        minHeight: 70,
-    },
-
-    categoryDialog: {
-        borderRadius: 24,
-        backgroundColor: "#FFFFFF",
-    },
-
-    categoryDialogTitle: {
-        color: "#234015",
-        fontWeight: "800",
-    },
-
-    categoryDialogScrollArea: {
-        paddingHorizontal: 0,
-        maxHeight: 430,
-    },
-
-    categoryDialogScroll: {
-        maxHeight: 420,
-    },
-
-    categoryDialogContent: {
-        paddingHorizontal: 18,
-        paddingVertical: 8,
-        gap: 10,
-    },
-
-    categoryOption: {
-        minHeight: 58,
-        borderRadius: 18,
-        borderWidth: 1,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-    },
-
-    categoryOptionPressed: {
-        opacity: 0.9,
-    },
-
-    categoryOptionIcon: {
-        width: 38,
-        height: 38,
-        borderRadius: 14,
-        borderWidth: 1,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    categoryOptionText: {
-        flex: 1,
-        fontSize: 14,
-        fontWeight: "800",
-        color: "#344054",
-    },
-
-    dialog: {
-        borderRadius: 24,
-        backgroundColor: "#FFFFFF",
-    },
-
-    dialogTitle: {
-        color: "#234015",
-        fontWeight: "800",
-        textTransform: "capitalize",
-    },
-
-    reorderHintBox: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 7,
-        backgroundColor: "#F8FAFC",
-        borderWidth: 1,
-        borderColor: "#ECEFF3",
-        borderRadius: 14,
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-        marginHorizontal: 20,
-        marginBottom: 10,
-    },
-
-    reorderHintText: {
-        flex: 1,
-        fontSize: 12,
-        color: "#667085",
-        lineHeight: 17,
-        fontWeight: "600",
-    },
-
-    dialogScrollArea: {
-        paddingHorizontal: 0,
-        borderTopWidth: 0,
-        borderBottomWidth: 0,
-    },
-
-    dialogScroll: {
-        maxHeight: 450,
-    },
-
-    dragList: {
-        maxHeight: 450,
-    },
-
-    dialogScrollContent: {
-        paddingHorizontal: 20,
-        paddingBottom: -5,
-    },
-
-    taskItem: {
-        borderWidth: 1,
-        borderColor: "#E7EEE1",
-        backgroundColor: "#FFFFFF",
-        borderRadius: 18,
-        paddingHorizontal: 14,
-        paddingVertical: 13,
-        marginBottom: 12,
-    },
-
-    taskItemPinned: {
-        borderColor: "rgba(245,158,11,0.35)",
-        backgroundColor: "rgba(255,251,235,0.62)",
-    },
-
-    taskItemDragging: {
-        opacity: 0.94,
-        elevation: 5,
-        transform: [{ scale: 1.01 }],
-    },
-
-    taskTop: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        gap: 10,
-        marginBottom: 10,
-    },
-
-    taskAvatarGroup: {
-        minWidth: 44,
-        flexDirection: "row",
-        alignItems: "center",
-        paddingTop: 1,
-    },
-
-    taskAvatar: {
-        width: 34,
-        height: 34,
-        borderRadius: 13,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1.5,
-        borderColor: "#FFFFFF",
-    },
-
-    taskAvatarText: {
-        color: "#FFFFFF",
-        fontWeight: "900",
-        fontSize: 13,
-    },
-
-    taskTitleWrap: {
-        flex: 1,
-        minWidth: 0,
-        paddingTop: 1,
-    },
-
-    taskTitle: {
-        flex: 1,
-        fontSize: 15,
-        fontWeight: "800",
-        color: "#1F2937",
-        lineHeight: 21,
-    },
-
-    taskAssignedText: {
-        marginTop: 2,
-        fontSize: 12.5,
-        color: "#667085",
-        fontWeight: "600",
-    },
-
-    taskPriorityActions: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-    },
-
-    priorityActionButton: {
-        margin: 0,
-        width: 31,
-        height: 31,
-        borderRadius: 12,
-    },
-
-    dragHandle: {
-        width: 31,
-        height: 31,
-        borderRadius: 12,
-        backgroundColor: "#F8FAFC",
-        borderWidth: 1,
-        borderColor: "#ECEFF3",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    topTaskChipsRow: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 8,
-        marginBottom: 10,
-    },
-
-    principalChip: {
-        flexDirection: "row",
-        alignItems: "center",
-        borderWidth: 1,
-        borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        backgroundColor: "rgba(245,158,11,0.12)",
-        borderColor: "rgba(245,158,11,0.28)",
-    },
-
-    principalChipText: {
-        fontSize: 11.5,
-        fontWeight: "800",
-        color: "#B7791F",
-    },
-
-    categoryChip: {
-        alignSelf: "flex-start",
-        borderWidth: 1,
-    },
-
-    categoryChipText: {
-        fontWeight: "800",
-        fontSize: 12,
-    },
-
-    smallChip: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 5,
-        borderWidth: 1,
-        borderRadius: 999,
-        paddingHorizontal: 9,
-        paddingVertical: 5,
-    },
-
-    smallChipText: {
-        fontSize: 11.5,
-        fontWeight: "700",
-    },
-
-    taskDescription: {
-        color: "#475467",
-        lineHeight: 19,
-        marginBottom: 10,
-    },
-
-    metaStack: {
-        gap: 7,
-        marginBottom: 12,
-    },
-
-    modalMetaRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-    },
-
-    modalMetaText: {
-        flex: 1,
-        fontSize: 13,
-        color: "#667085",
-    },
-
-    modalMetaStrong: {
-        fontWeight: "800",
-        color: "#344054",
-    },
-
-    secondaryActionsBar: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#F8FAFC",
-        borderWidth: 1,
-        borderColor: "#ECEFF3",
-        borderRadius: 14,
-        paddingHorizontal: 6,
-        paddingVertical: 4,
-        marginBottom: 10,
-    },
-
-    secondaryActionButton: {
-        flex: 1,
-        height: 34,
-        borderRadius: 11,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-    },
-
-    secondaryActionButtonPressed: {
-        backgroundColor: "#FFFFFF",
-    },
-
-    secondaryActionText: {
-        fontSize: 12.5,
-        fontWeight: "800",
-    },
-
-    secondaryActionsDivider: {
-        width: 1,
-        height: 22,
-        backgroundColor: "#E5E7EB",
-        marginHorizontal: 2,
-    },
-
-    toggleTaskButton: {
-        borderRadius: 14,
-    },
-
-    toggleTaskButtonContent: {
-        height: 42,
-    },
-
-    reorderingBox: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        paddingVertical: 8,
-    },
-
-    reorderingText: {
-        fontSize: 12.5,
-        fontWeight: "700",
-        color: "#667085",
-    },
-
-    modalActionsRow: {
-        justifyContent: "space-between",
-        paddingHorizontal: 15,
-        paddingTop: 0,
-        paddingBottom: 10,
-    },
-
-    modalSmallButton: {
-        borderRadius: 14,
-    },
-
-    modalSmallButtonLabel: {
-        fontSize: 12.5,
-        fontWeight: "800",
-    },
-
-    emptyDialogBox: {
-        paddingTop: 10,
-        paddingBottom: 8,
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-    },
-
-    emptyDialogIconCircle: {
-        width: 66,
-        height: 66,
-        borderRadius: 33,
-        backgroundColor: "#F6F9F2",
-        borderWidth: 1,
-        borderColor: "#E3ECD9",
-        alignItems: "center",
-        justifyContent: "center",
-        marginBottom: 4,
-    },
-
-    emptyDialogTitle: {
-        fontSize: 15,
-        fontWeight: "800",
-        color: "#344054",
-        textAlign: "center",
-    },
-
-    emptyDialogText: {
-        fontSize: 13.5,
-        color: "#667085",
-        textAlign: "center",
-        lineHeight: 20,
-        marginBottom: 8,
-    },
-
-    deleteDialog: {
-        borderRadius: 24,
-        backgroundColor: "#FFFFFF",
-    },
-
-    deleteDialogContent: {
-        alignItems: "center",
-        paddingTop: 24,
-        paddingBottom: 18,
-    },
-
-    deleteIconCircle: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: "#B42318",
-        alignItems: "center",
-        justifyContent: "center",
-        marginBottom: 14,
-    },
-
-    deleteDialogTitle: {
-        fontWeight: "800",
-        color: "#1F2937",
-        textAlign: "center",
-        marginBottom: 8,
-    },
-
-    deleteDialogText: {
-        color: "#667085",
-        textAlign: "center",
-        lineHeight: 21,
-        marginBottom: 18,
-    },
-
-    deleteDialogStrong: {
-        fontWeight: "800",
-        color: "#1F2937",
-    },
-
-    deleteDialogActions: {
-        width: "100%",
-        flexDirection: "row",
-        gap: 10,
-    },
-
-    cancelDeleteButton: {
-        flex: 1,
-        borderRadius: 16,
-        borderColor: "#D0D5DD",
-    },
-
-    confirmDeleteButton: {
-        flex: 1,
-        borderRadius: 16,
-    },
-});
+function createStyles(palette, isDarkMode) {
+    return StyleSheet.create({
+        container: {
+            flex: 1,
+            paddingHorizontal: 2,
+        },
+
+        scrollContent: {
+            flexGrow: 1,
+        },
+
+        backgroundOrbTop: {
+            position: "absolute",
+            top: -130,
+            right: -70,
+            width: 250,
+            height: 250,
+            borderRadius: 125,
+            backgroundColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.08)"
+                : "rgba(209, 107, 24, 0.06)",
+        },
+
+        backgroundOrbBottom: {
+            position: "absolute",
+            bottom: -120,
+            left: -80,
+            width: 240,
+            height: 240,
+            borderRadius: 120,
+            backgroundColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.055)"
+                : "rgba(209, 107, 24, 0.045)",
+        },
+
+        header: {
+            paddingHorizontal: 10,
+            marginBottom: 12,
+        },
+
+        title: {
+            fontWeight: "900",
+            color: palette.text,
+            marginBottom: 8,
+        },
+
+        subtitle: {
+            color: palette.textSecondary,
+            lineHeight: 21,
+            maxWidth: 340,
+        },
+
+        filtersCard: {
+            borderRadius: 20,
+            backgroundColor: palette.card,
+            borderWidth: 1,
+            borderColor: palette.border,
+            elevation: 1,
+            shadowColor: palette.shadow,
+            shadowOpacity: isDarkMode ? 0.15 : 0.05,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 4 },
+            marginHorizontal: 6,
+            marginBottom: 10,
+        },
+
+        filtersContent: {
+            paddingHorizontal: 12,
+            paddingTop: 11,
+            paddingBottom: 11,
+        },
+
+        filtersTopRow: {
+            height: 28,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 9,
+            overflow: "hidden",
+        },
+
+        filtersTitleRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 7,
+            flex: 1,
+        },
+
+        filtersIconWrap: {
+            width: 27,
+            height: 27,
+            borderRadius: 10,
+            backgroundColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.11)"
+                : "rgba(209, 107, 24, 0.08)",
+            borderWidth: 1,
+            borderColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.22)"
+                : "rgba(209, 107, 24, 0.18)",
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        filtersTitle: {
+            fontSize: 13.5,
+            fontWeight: "800",
+            color: palette.text,
+        },
+
+        clearFiltersPressable: {
+            width: 64,
+            height: 28,
+            alignItems: "flex-end",
+            justifyContent: "center",
+            overflow: "hidden",
+        },
+
+        clearFiltersText: {
+            fontSize: 12,
+            fontWeight: "800",
+            color: palette.textSecondary,
+        },
+
+        clearFiltersTextHidden: {
+            opacity: 0,
+        },
+
+        filtersScrollContent: {
+            gap: 8,
+            paddingRight: 4,
+        },
+
+        filterChip: {
+            backgroundColor: isDarkMode ? "rgba(255,255,255,0.025)" : "#FFFFFF",
+            borderWidth: 1,
+            borderColor: palette.border,
+        },
+
+        filterChipSelected: {
+            backgroundColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.13)"
+                : "rgba(209, 107, 24, 0.10)",
+            borderColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.26)"
+                : "rgba(209, 107, 24, 0.22)",
+        },
+
+        filterChipText: {
+            fontSize: 12,
+            color: palette.textSecondary,
+            fontWeight: "700",
+        },
+
+        calendarCard: {
+            borderRadius: 22,
+            backgroundColor: palette.card,
+            borderWidth: 1,
+            borderColor: palette.border,
+            elevation: 3,
+            shadowColor: palette.shadow,
+            shadowOpacity: isDarkMode ? 0.18 : 0.06,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 6 },
+            marginHorizontal: 0,
+            marginBottom: 14,
+            overflow: "hidden",
+        },
+
+        calendarContent: {
+            paddingTop: 10,
+            paddingBottom: 6,
+            paddingHorizontal: 0,
+        },
+
+        calendarHeader: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 8,
+            marginBottom: 8,
+        },
+
+        calendarArrowButton: {
+            margin: 0,
+            width: 38,
+            height: 38,
+            borderRadius: 14,
+        },
+
+        calendarTitleWrap: {
+            alignItems: "center",
+            flex: 1,
+        },
+
+        calendarTitle: {
+            fontSize: 19,
+            fontWeight: "900",
+            color: palette.text,
+            textTransform: "capitalize",
+        },
+
+        calendarSubtitle: {
+            marginTop: 2,
+            fontSize: 11.5,
+            fontWeight: "700",
+            color: palette.textSecondary,
+        },
+
+        viewModeSwitch: {
+            flexDirection: "row",
+            backgroundColor: isDarkMode ? "rgba(255,255,255,0.035)" : "#FAF8F5",
+            borderWidth: 1,
+            borderColor: palette.border,
+            borderRadius: 16,
+            padding: 4,
+            marginHorizontal: 12,
+            marginBottom: 10,
+            gap: 4,
+        },
+
+        viewModeOption: {
+            flex: 1,
+            height: 34,
+            borderRadius: 12,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+        },
+
+        viewModeOptionActive: {
+            backgroundColor: palette.primary,
+        },
+
+        viewModeText: {
+            fontSize: 12.5,
+            fontWeight: "800",
+            color: palette.primary,
+        },
+
+        viewModeTextActive: {
+            color: "#FFFFFF",
+        },
+
+        loadingBox: {
+            paddingVertical: 34,
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+        },
+
+        loadingText: {
+            color: palette.textSecondary,
+            fontWeight: "600",
+        },
+
+        monthCalendar: {
+            width: "100%",
+        },
+
+        weekHeaderRow: {
+            flexDirection: "row",
+            alignItems: "center",
+        },
+
+        weekHeaderCell: {
+            height: 24,
+            alignItems: "center",
+            justifyContent: "center",
+            borderBottomWidth: 1,
+            borderBottomColor: palette.border,
+        },
+
+        weekHeaderText: {
+            fontSize: 11,
+            fontWeight: "900",
+            color: palette.textSecondary,
+        },
+
+        monthWeekRow: {
+            flexDirection: "row",
+            alignItems: "stretch",
+        },
+
+        monthDayCell: {
+            borderWidth: 0.5,
+            borderColor: palette.border,
+            paddingHorizontal: 1,
+            paddingTop: 2,
+            paddingBottom: 2,
+            overflow: "hidden",
+            backgroundColor: palette.card,
+        },
+
+        monthDayCellPast: {
+            backgroundColor: isDarkMode ? "rgba(255,255,255,0.025)" : "#F1EDE8",
+            borderColor: isDarkMode ? "rgba(255,255,255,0.07)" : "#DDD5CE",
+        },
+
+        monthDayCellSelected: {
+            backgroundColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.10)"
+                : "rgba(209, 107, 24, 0.09)",
+        },
+
+        monthDayCellToday: {
+            borderColor: palette.primary,
+            borderWidth: 2,
+        },
+
+        monthDayCellPressed: {
+            opacity: 0.86,
+        },
+
+        monthDayNumber: {
+            fontSize: 11,
+            fontWeight: "900",
+            color: palette.text,
+            textAlign: "center",
+            marginBottom: 2,
+        },
+
+        monthDayNumberPast: {
+            color: palette.textMuted,
+        },
+
+        monthDayNumberDisabled: {
+            color: isDarkMode ? "rgba(255,255,255,0.22)" : "#B5AAA0",
+        },
+
+        monthDayNumberToday: {
+            color: "#FFFFFF",
+            backgroundColor: palette.primary,
+            paddingHorizontal: 6,
+            paddingVertical: 1,
+            borderRadius: 999,
+            overflow: "hidden",
+        },
+
+        dayPinnedBadge: {
+            position: "absolute",
+            top: 1,
+            right: 1,
+            width: 16,
+            height: 16,
+            borderRadius: 999,
+            backgroundColor: "#F59E0B",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 5,
+            borderWidth: 1.5,
+            borderColor: palette.card,
+        },
+
+        monthTasksWrap: {
+            flex: 1,
+            gap: 2,
+        },
+
+        monthTaskCard: {
+            borderWidth: 1,
+            borderRadius: 8,
+            minHeight: 29,
+            paddingHorizontal: 1,
+            paddingVertical: 2,
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+        },
+
+        taskPreviewInitialsRow: {
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "center",
+            marginBottom: 1,
+        },
+
+        monthTaskInitial: {
+            width: 14,
+            height: 14,
+            borderRadius: 999,
+            alignItems: "center",
+            justifyContent: "center",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.85)",
+            marginHorizontal: -1,
+        },
+
+        monthTaskInitialText: {
+            fontSize: 7.5,
+            fontWeight: "900",
+            color: "#FFFFFF",
+            lineHeight: 9,
+        },
+
+        monthTaskTitle: {
+            width: "100%",
+            textAlign: "center",
+            fontSize: 7.8,
+            fontWeight: "900",
+            lineHeight: 8.5,
+        },
+
+        monthMoreBadge: {
+            alignSelf: "center",
+            minWidth: 27,
+            height: 14,
+            borderRadius: 999,
+            backgroundColor: isDarkMode ? "rgba(255,255,255,0.035)" : "#F8FAFC",
+            borderWidth: 1,
+            borderColor: palette.border,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 5,
+            marginTop: 1,
+        },
+
+        monthMoreBadgePast: {
+            backgroundColor: isDarkMode ? "rgba(255,255,255,0.045)" : "#E2E8F0",
+            borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "#CBD5E1",
+        },
+
+        monthMoreText: {
+            fontSize: 8,
+            fontWeight: "900",
+            color: palette.textSecondary,
+            lineHeight: 9,
+        },
+
+        monthMoreTextPast: {
+            color: palette.textMuted,
+        },
+
+        weekCalendarScrollContent: {
+            paddingHorizontal: 0,
+        },
+
+        weekCalendar: {
+            minWidth: "100%",
+        },
+
+        weekColumnsRow: {
+            flexDirection: "row",
+            alignItems: "stretch",
+        },
+
+        weekDayColumn: {
+            minHeight: 390,
+            borderWidth: 0.5,
+            borderColor: palette.border,
+            backgroundColor: palette.card,
+            paddingHorizontal: 2,
+            paddingTop: 3,
+            paddingBottom: 4,
+            overflow: "visible",
+        },
+
+        weekDayColumnPast: {
+            backgroundColor: isDarkMode ? "rgba(255,255,255,0.025)" : "#F1EDE8",
+            borderColor: isDarkMode ? "rgba(255,255,255,0.07)" : "#DDD5CE",
+        },
+
+        weekDayColumnSelected: {
+            backgroundColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.09)"
+                : "rgba(209, 107, 24, 0.08)",
+        },
+
+        weekDayColumnToday: {
+            borderColor: palette.primary,
+            borderWidth: 2,
+        },
+
+        weekDayColumnPressed: {
+            opacity: 0.88,
+        },
+
+        weekPinnedBadge: {
+            position: "absolute",
+            top: 2,
+            right: 2,
+            width: 16,
+            height: 16,
+            borderRadius: 999,
+            backgroundColor: "#F59E0B",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 5,
+            borderWidth: 1.5,
+            borderColor: palette.card,
+        },
+
+        weekDayNumber: {
+            fontSize: 13,
+            fontWeight: "900",
+            color: palette.text,
+            textAlign: "center",
+            marginBottom: 4,
+        },
+
+        weekDayNumberPast: {
+            color: palette.textMuted,
+        },
+
+        weekDayNumberToday: {
+            color: "#FFFFFF",
+            backgroundColor: palette.primary,
+            paddingHorizontal: 7,
+            paddingVertical: 2,
+            borderRadius: 999,
+            overflow: "hidden",
+        },
+
+        weekTasksWrap: {
+            gap: 5,
+        },
+
+        weekTaskCard: {
+            borderWidth: 1,
+            borderRadius: 10,
+            minHeight: 54,
+            paddingHorizontal: 3,
+            paddingVertical: 5,
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+        },
+
+        weekTaskInitial: {
+            width: 18,
+            height: 18,
+            borderRadius: 999,
+            alignItems: "center",
+            justifyContent: "center",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.85)",
+            marginHorizontal: -1,
+        },
+
+        weekTaskInitialText: {
+            fontSize: 8.5,
+            fontWeight: "900",
+            color: "#FFFFFF",
+            lineHeight: 10,
+        },
+
+        weekTaskTitle: {
+            width: "100%",
+            textAlign: "center",
+            fontSize: 9,
+            fontWeight: "900",
+            lineHeight: 11,
+        },
+
+        weekEmptySpace: {
+            minHeight: 70,
+        },
+
+        categoryDialog: {
+            borderRadius: 24,
+            backgroundColor: palette.card,
+        },
+
+        categoryDialogTitle: {
+            color: palette.text,
+            fontWeight: "800",
+        },
+
+        categoryDialogScrollArea: {
+            paddingHorizontal: 0,
+            maxHeight: 430,
+        },
+
+        categoryDialogScroll: {
+            maxHeight: 420,
+        },
+
+        categoryDialogContent: {
+            paddingHorizontal: 18,
+            paddingVertical: 8,
+            gap: 10,
+        },
+
+        categoryOption: {
+            minHeight: 58,
+            borderRadius: 18,
+            borderWidth: 1,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+        },
+
+        categoryOptionPressed: {
+            opacity: 0.9,
+        },
+
+        categoryOptionIcon: {
+            width: 38,
+            height: 38,
+            borderRadius: 14,
+            borderWidth: 1,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        categoryOptionText: {
+            flex: 1,
+            fontSize: 14,
+            fontWeight: "800",
+            color: palette.text,
+        },
+
+        dialog: {
+            borderRadius: 24,
+            backgroundColor: palette.card,
+        },
+
+        dialogTitle: {
+            color: palette.text,
+            fontWeight: "800",
+            textTransform: "capitalize",
+        },
+
+        reorderHintBox: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 7,
+            backgroundColor: isDarkMode ? "rgba(255,255,255,0.035)" : "#F8FAFC",
+            borderWidth: 1,
+            borderColor: palette.border,
+            borderRadius: 14,
+            paddingHorizontal: 10,
+            paddingVertical: 8,
+            marginHorizontal: 20,
+            marginBottom: 10,
+        },
+
+        reorderHintText: {
+            flex: 1,
+            fontSize: 12,
+            color: palette.textSecondary,
+            lineHeight: 17,
+            fontWeight: "600",
+        },
+
+        dialogScrollArea: {
+            paddingHorizontal: 0,
+            borderTopWidth: 0,
+            borderBottomWidth: 0,
+        },
+
+        dialogScroll: {
+            maxHeight: 450,
+        },
+
+        dragList: {
+            maxHeight: 450,
+        },
+
+        dialogScrollContent: {
+            paddingHorizontal: 20,
+            paddingBottom: -5,
+        },
+
+        taskItem: {
+            borderWidth: 1,
+            borderColor: palette.border,
+            backgroundColor: palette.card,
+            borderRadius: 18,
+            paddingHorizontal: 14,
+            paddingVertical: 13,
+            marginBottom: 12,
+        },
+
+        taskItemPinned: {
+            borderColor: "rgba(245,158,11,0.35)",
+            backgroundColor: isDarkMode
+                ? "rgba(245,158,11,0.08)"
+                : "rgba(255,251,235,0.62)",
+        },
+
+        taskItemDragging: {
+            opacity: 0.94,
+            elevation: 5,
+            transform: [{ scale: 1.01 }],
+        },
+
+        taskTop: {
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: 10,
+            marginBottom: 10,
+        },
+
+        taskAvatarGroup: {
+            minWidth: 44,
+            flexDirection: "row",
+            alignItems: "center",
+            paddingTop: 1,
+        },
+
+        taskAvatar: {
+            width: 34,
+            height: 34,
+            borderRadius: 13,
+            alignItems: "center",
+            justifyContent: "center",
+            borderWidth: 1.5,
+            borderColor: palette.card,
+        },
+
+        taskAvatarText: {
+            color: "#FFFFFF",
+            fontWeight: "900",
+            fontSize: 13,
+        },
+
+        taskTitleWrap: {
+            flex: 1,
+            minWidth: 0,
+            paddingTop: 1,
+        },
+
+        taskTitle: {
+            flex: 1,
+            fontSize: 15,
+            fontWeight: "800",
+            color: palette.text,
+            lineHeight: 21,
+        },
+
+        taskAssignedText: {
+            marginTop: 2,
+            fontSize: 12.5,
+            color: palette.textSecondary,
+            fontWeight: "600",
+        },
+
+        taskPriorityActions: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+        },
+
+        priorityActionButton: {
+            margin: 0,
+            width: 31,
+            height: 31,
+            borderRadius: 12,
+        },
+
+        dragHandle: {
+            width: 31,
+            height: 31,
+            borderRadius: 12,
+            backgroundColor: isDarkMode ? "rgba(255,255,255,0.035)" : "#F8FAFC",
+            borderWidth: 1,
+            borderColor: palette.border,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        topTaskChipsRow: {
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 8,
+            marginBottom: 10,
+        },
+
+        principalChip: {
+            flexDirection: "row",
+            alignItems: "center",
+            borderWidth: 1,
+            borderRadius: 999,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            backgroundColor: "rgba(245,158,11,0.12)",
+            borderColor: "rgba(245,158,11,0.28)",
+        },
+
+        principalChipText: {
+            fontSize: 11.5,
+            fontWeight: "800",
+            color: palette.warning,
+        },
+
+        categoryChip: {
+            alignSelf: "flex-start",
+            borderWidth: 1,
+        },
+
+        categoryChipText: {
+            fontWeight: "800",
+            fontSize: 12,
+        },
+
+        smallChip: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+            borderWidth: 1,
+            borderRadius: 999,
+            paddingHorizontal: 9,
+            paddingVertical: 5,
+        },
+
+        smallChipText: {
+            fontSize: 11.5,
+            fontWeight: "700",
+        },
+
+        taskDescription: {
+            color: palette.textSecondary,
+            lineHeight: 19,
+            marginBottom: 10,
+        },
+
+        metaStack: {
+            gap: 7,
+            marginBottom: 12,
+        },
+
+        modalMetaRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+        },
+
+        modalMetaText: {
+            flex: 1,
+            fontSize: 13,
+            color: palette.textSecondary,
+        },
+
+        modalMetaStrong: {
+            fontWeight: "800",
+            color: palette.text,
+        },
+
+        secondaryActionsBar: {
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: isDarkMode ? "rgba(255,255,255,0.035)" : "#F8FAFC",
+            borderWidth: 1,
+            borderColor: palette.border,
+            borderRadius: 14,
+            paddingHorizontal: 6,
+            paddingVertical: 4,
+            marginBottom: 10,
+        },
+
+        secondaryActionButton: {
+            flex: 1,
+            height: 34,
+            borderRadius: 11,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+        },
+
+        secondaryActionButtonPressed: {
+            backgroundColor: isDarkMode ? "rgba(255,255,255,0.04)" : "#FFFFFF",
+        },
+
+        secondaryActionText: {
+            fontSize: 12.5,
+            fontWeight: "800",
+        },
+
+        secondaryActionsDivider: {
+            width: 1,
+            height: 22,
+            backgroundColor: palette.border,
+            marginHorizontal: 2,
+        },
+
+        toggleTaskButton: {
+            borderRadius: 14,
+        },
+
+        toggleTaskButtonContent: {
+            height: 42,
+        },
+
+        reorderingBox: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            paddingVertical: 8,
+        },
+
+        reorderingText: {
+            fontSize: 12.5,
+            fontWeight: "700",
+            color: palette.textSecondary,
+        },
+
+        modalActionsRow: {
+            justifyContent: "space-between",
+            paddingHorizontal: 15,
+            paddingTop: 0,
+            paddingBottom: 10,
+        },
+
+        modalSmallButton: {
+            borderRadius: 14,
+        },
+
+        modalSmallButtonLabel: {
+            fontSize: 12.5,
+            fontWeight: "800",
+        },
+
+        emptyDialogBox: {
+            paddingTop: 10,
+            paddingBottom: 8,
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+        },
+
+        emptyDialogIconCircle: {
+            width: 66,
+            height: 66,
+            borderRadius: 33,
+            backgroundColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.11)"
+                : "rgba(209, 107, 24, 0.08)",
+            borderWidth: 1,
+            borderColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.22)"
+                : "rgba(209, 107, 24, 0.18)",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 4,
+        },
+
+        emptyDialogTitle: {
+            fontSize: 15,
+            fontWeight: "800",
+            color: palette.text,
+            textAlign: "center",
+        },
+
+        emptyDialogText: {
+            fontSize: 13.5,
+            color: palette.textSecondary,
+            textAlign: "center",
+            lineHeight: 20,
+            marginBottom: 8,
+        },
+
+        deleteDialog: {
+            borderRadius: 24,
+            backgroundColor: palette.card,
+        },
+
+        deleteDialogContent: {
+            alignItems: "center",
+            paddingTop: 24,
+            paddingBottom: 18,
+        },
+
+        deleteIconCircle: {
+            width: 64,
+            height: 64,
+            borderRadius: 32,
+            backgroundColor: palette.danger,
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 14,
+        },
+
+        deleteDialogTitle: {
+            fontWeight: "800",
+            color: palette.text,
+            textAlign: "center",
+            marginBottom: 8,
+        },
+
+        deleteDialogText: {
+            color: palette.textSecondary,
+            textAlign: "center",
+            lineHeight: 21,
+            marginBottom: 18,
+        },
+
+        deleteDialogStrong: {
+            fontWeight: "800",
+            color: palette.text,
+        },
+
+        deleteDialogActions: {
+            width: "100%",
+            flexDirection: "row",
+            gap: 10,
+        },
+
+        cancelDeleteButton: {
+            flex: 1,
+            borderRadius: 16,
+            borderColor: palette.border,
+        },
+
+        confirmDeleteButton: {
+            flex: 1,
+            borderRadius: 16,
+        },
+    });
+}

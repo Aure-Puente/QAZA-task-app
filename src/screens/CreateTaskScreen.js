@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StatusBar,
@@ -63,6 +64,50 @@ export default function CreateTaskScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
+  const isDarkMode = !!theme.dark;
+  const custom = theme.custom || {};
+
+  const palette = useMemo(
+    () => ({
+      background: theme.colors.background,
+      surface: theme.colors.surface,
+      primary: theme.colors.primary,
+      text: theme.colors.onBackground,
+      textSecondary: custom.textSecondary || theme.colors.onSurfaceVariant,
+      textMuted: custom.textMuted || theme.colors.onSurfaceVariant,
+      border: custom.border || theme.colors.outline,
+      outline: custom.outline || theme.colors.outlineVariant || theme.colors.outline,
+      softBg: custom.softBg || theme.colors.surfaceVariant,
+      card: custom.card || theme.colors.surface,
+      inputBg: custom.inputBg || theme.colors.surface,
+      danger: custom.danger || theme.colors.error || "#B42318",
+      success: custom.success || "#2E7D32",
+      warning: custom.warning || "#B7791F",
+      shadow: custom.shadow || "#000000",
+    }),
+    [theme, custom]
+  );
+
+  const styles = useMemo(
+    () => createStyles(palette, isDarkMode),
+    [palette, isDarkMode]
+  );
+
+  const inputTheme = useMemo(
+    () => ({
+      colors: {
+        primary: palette.primary,
+        outline: palette.border,
+        background: palette.inputBg,
+        onSurfaceVariant: palette.textSecondary,
+        onSurface: palette.text,
+        text: palette.text,
+        placeholder: palette.textMuted,
+      },
+    }),
+    [palette]
+  );
+
   const dueDate = getDateFromRouteParam(route?.params?.selectedDate);
 
   const [title, setTitle] = useState("");
@@ -101,8 +146,10 @@ export default function CreateTaskScreen({ navigation, route }) {
   const loadUsers = async () => {
     try {
       setUsersLoading(true);
+
       const data = await getAllUsers();
       const safeUsers = Array.isArray(data) ? data : [];
+
       setUsers(safeUsers);
     } catch (error) {
       console.log("LOAD USERS ERROR:", error);
@@ -262,12 +309,18 @@ export default function CreateTaskScreen({ navigation, route }) {
   return (
     <>
       <View style={styles.screen}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F4F8F1" />
+        <StatusBar
+          barStyle={isDarkMode ? "light-content" : "dark-content"}
+          backgroundColor={palette.background}
+        />
 
         <View style={styles.backgroundShapeTop} />
         <View style={styles.backgroundShapeBottom} />
 
-        <KeyboardAvoidingView style={styles.flex}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <ScrollView
             contentContainerStyle={[
               styles.scrollContent,
@@ -291,12 +344,13 @@ export default function CreateTaskScreen({ navigation, route }) {
                 <MaterialCommunityIcons
                   name="calendar-check-outline"
                   size={20}
-                  color={theme.colors.primary}
+                  color={palette.primary}
                 />
               </View>
 
               <View style={styles.dateInfoTextWrap}>
                 <Text style={styles.dateInfoLabel}>Tarea para el día</Text>
+
                 <Text style={styles.dateInfoValue}>
                   {formatDateLabel(dueDate)}
                 </Text>
@@ -314,13 +368,8 @@ export default function CreateTaskScreen({ navigation, route }) {
                   outlineStyle={styles.inputOutline}
                   contentStyle={styles.inputContent}
                   left={<TextInput.Icon icon="text-box-outline" />}
-                  theme={{
-                    colors: {
-                      primary: "#4E7A28",
-                      outline: "#C9D8BF",
-                      background: "#FFFFFF",
-                    },
-                  }}
+                  textColor={palette.text}
+                  theme={inputTheme}
                 />
 
                 <TextInput
@@ -334,13 +383,8 @@ export default function CreateTaskScreen({ navigation, route }) {
                   outlineStyle={styles.inputOutline}
                   contentStyle={[styles.inputContent, styles.textAreaContent]}
                   left={<TextInput.Icon icon="file-document-outline" />}
-                  theme={{
-                    colors: {
-                      primary: "#4E7A28",
-                      outline: "#C9D8BF",
-                      background: "#FFFFFF",
-                    },
-                  }}
+                  textColor={palette.text}
+                  theme={inputTheme}
                 />
 
                 <View style={styles.sectionHeader}>
@@ -349,7 +393,7 @@ export default function CreateTaskScreen({ navigation, route }) {
                       <MaterialCommunityIcons
                         name="shape-outline"
                         size={16}
-                        color={theme.colors.primary}
+                        color={palette.primary}
                       />
                     </View>
 
@@ -389,6 +433,7 @@ export default function CreateTaskScreen({ navigation, route }) {
 
                     <View style={styles.selectorTextWrap}>
                       <Text style={styles.selectorLabel}>Categoría</Text>
+
                       <Text
                         style={[
                           styles.selectorValue,
@@ -404,7 +449,7 @@ export default function CreateTaskScreen({ navigation, route }) {
                     <MaterialCommunityIcons
                       name="chevron-right"
                       size={20}
-                      color="#6B7280"
+                      color={palette.textMuted}
                     />
                   </View>
                 </Pressable>
@@ -415,7 +460,7 @@ export default function CreateTaskScreen({ navigation, route }) {
                       <MaterialCommunityIcons
                         name="account-multiple-check-outline"
                         size={16}
-                        color={theme.colors.primary}
+                        color={palette.primary}
                       />
                     </View>
 
@@ -445,12 +490,13 @@ export default function CreateTaskScreen({ navigation, route }) {
                       <MaterialCommunityIcons
                         name="account-multiple-outline"
                         size={18}
-                        color={theme.colors.primary}
+                        color={palette.primary}
                       />
                     </View>
 
                     <View style={styles.selectorTextWrap}>
                       <Text style={styles.selectorLabel}>Responsables</Text>
+
                       <Text style={styles.selectorValue}>
                         {selectedUsersText}
                       </Text>
@@ -459,12 +505,12 @@ export default function CreateTaskScreen({ navigation, route }) {
 
                   <View style={styles.chevronBadge}>
                     {usersLoading ? (
-                      <ActivityIndicator size={16} color={theme.colors.primary} />
+                      <ActivityIndicator size={16} color={palette.primary} />
                     ) : (
                       <MaterialCommunityIcons
                         name="chevron-right"
                         size={20}
-                        color="#6B7280"
+                        color={palette.textMuted}
                       />
                     )}
                   </View>
@@ -492,7 +538,7 @@ export default function CreateTaskScreen({ navigation, route }) {
                           <MaterialCommunityIcons
                             name="close"
                             size={14}
-                            color="#667085"
+                            color={palette.textSecondary}
                           />
                         </Pressable>
                       </View>
@@ -504,8 +550,9 @@ export default function CreateTaskScreen({ navigation, route }) {
                   <MaterialCommunityIcons
                     name="information-outline"
                     size={16}
-                    color="#6B7280"
+                    color={palette.textMuted}
                   />
+
                   <Text style={styles.infoText}>
                     Las tareas nacen como pendientes. Luego desde el calendario se pueden marcar como completadas.
                   </Text>
@@ -519,7 +566,8 @@ export default function CreateTaskScreen({ navigation, route }) {
                   style={styles.saveButton}
                   contentStyle={styles.saveButtonContent}
                   labelStyle={styles.saveButtonLabel}
-                  buttonColor={theme.colors.primary}
+                  buttonColor={palette.primary}
+                  textColor="#FFFFFF"
                   icon="plus"
                 >
                   Guardar tarea
@@ -529,7 +577,7 @@ export default function CreateTaskScreen({ navigation, route }) {
                   mode="text"
                   onPress={() => navigation.goBack()}
                   disabled={saving}
-                  textColor="#667085"
+                  textColor={palette.textSecondary}
                   style={styles.cancelButton}
                 >
                   Cancelar
@@ -566,8 +614,12 @@ export default function CreateTaskScreen({ navigation, route }) {
                     style={({ pressed }) => [
                       styles.optionItem,
                       {
-                        backgroundColor: isSelected ? item.soft : "#FFFFFF",
-                        borderColor: isSelected ? item.border : "#ECEFF3",
+                        backgroundColor: isSelected
+                          ? item.soft
+                          : isDarkMode
+                          ? "rgba(255,255,255,0.025)"
+                          : "#FFFFFF",
+                        borderColor: isSelected ? item.border : palette.border,
                       },
                       pressed && styles.optionItemPressed,
                     ]}
@@ -645,9 +697,13 @@ export default function CreateTaskScreen({ navigation, route }) {
                     >
                       <View style={styles.optionAvatar}>
                         <MaterialCommunityIcons
-                          name={isSelected ? "account-check-outline" : "account-outline"}
+                          name={
+                            isSelected
+                              ? "account-check-outline"
+                              : "account-outline"
+                          }
                           size={18}
-                          color={theme.colors.primary}
+                          color={palette.primary}
                         />
                       </View>
 
@@ -667,7 +723,7 @@ export default function CreateTaskScreen({ navigation, route }) {
                         <MaterialCommunityIcons
                           name="check-circle"
                           size={20}
-                          color={theme.colors.primary}
+                          color={palette.primary}
                         />
                       ) : null}
                     </Pressable>
@@ -684,7 +740,7 @@ export default function CreateTaskScreen({ navigation, route }) {
           <Dialog.Actions style={styles.assignDialogActions}>
             <Button
               onPress={() => setSelectedUsers([])}
-              textColor="#667085"
+              textColor={palette.textSecondary}
               disabled={selectedUsers.length === 0}
             >
               Limpiar
@@ -693,7 +749,8 @@ export default function CreateTaskScreen({ navigation, route }) {
             <Button
               mode="contained"
               onPress={() => setAssignDialogVisible(false)}
-              buttonColor={theme.colors.primary}
+              buttonColor={palette.primary}
+              textColor="#FFFFFF"
               style={styles.assignDialogDoneButton}
             >
               Listo
@@ -724,7 +781,8 @@ export default function CreateTaskScreen({ navigation, route }) {
               onPress={handleCloseSuccess}
               style={styles.successButton}
               contentStyle={styles.successButtonContent}
-              buttonColor={theme.colors.primary}
+              buttonColor={palette.primary}
+              textColor="#FFFFFF"
             >
               Continuar
             </Button>
@@ -735,453 +793,485 @@ export default function CreateTaskScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-
-  screen: {
-    flex: 1,
-    backgroundColor: "#F4F8F1",
-  },
-
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 16,
-  },
-
-  backgroundShapeTop: {
-    position: "absolute",
-    top: -120,
-    right: -70,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: "rgba(78, 122, 40, 0.08)",
-  },
-
-  backgroundShapeBottom: {
-    position: "absolute",
-    bottom: -100,
-    left: -60,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "rgba(78, 122, 40, 0.06)",
-  },
-
-  dateInfoCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    marginBottom: 16,
-    elevation: 2,
-  },
-
-  dateInfoIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
-    backgroundColor: "#F6F9F2",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  dateInfoTextWrap: {
-    flex: 1,
-  },
-
-  dateInfoLabel: {
-    fontSize: 12,
-    color: "#667085",
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-
-  dateInfoValue: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#1F2937",
-    textTransform: "capitalize",
-  },
-
-  headerBlock: {
-    marginBottom: 16,
-  },
-
-  title: {
-    color: "#234015",
-    fontWeight: "800",
-    marginBottom: 8,
-  },
-
-  subtitle: {
-    color: "#5E6E57",
-    lineHeight: 21,
-    maxWidth: 340,
-  },
-
-  card: {
-    borderRadius: 24,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    elevation: 3,
-  },
-
-  cardContent: {
-    paddingHorizontal: 18,
-    paddingTop: 20,
-    paddingBottom: 18,
-  },
-
-  input: {
-    backgroundColor: "#FFFFFF",
-    marginBottom: 14,
-  },
-
-  inputOutline: {
-    borderRadius: 16,
-  },
-
-  inputContent: {
-    minHeight: 54,
-  },
-
-  textAreaContent: {
-    minHeight: 120,
-    paddingTop: 12,
-  },
-
-  sectionHeader: {
-    marginTop: 2,
-    marginBottom: 10,
-  },
-
-  sectionTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 5,
-  },
-
-  sectionIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 10,
-    backgroundColor: "#F6F9F2",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  label: {
-    fontWeight: "800",
-    color: "#344054",
-  },
-
-  sectionHint: {
-    fontSize: 12.5,
-    color: "#667085",
-    lineHeight: 18,
-  },
-
-  selectorTrigger: {
-    minHeight: 62,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#C9D8BF",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  selectorTriggerPressed: {
-    opacity: 0.9,
-  },
-
-  selectorLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-
-  selectorAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    backgroundColor: "#F6F9F2",
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  selectorTextWrap: {
-    flex: 1,
-  },
-
-  selectorLabel: {
-    fontSize: 11.5,
-    color: "#667085",
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-
-  selectorValue: {
-    fontSize: 14.5,
-    fontWeight: "800",
-    color: "#344054",
-  },
-
-  chevronBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 12,
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1,
-    borderColor: "#ECEFF3",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  selectedUsersWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: -6,
-    marginBottom: 16,
-  },
-
-  selectedUserChip: {
-    maxWidth: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#F6F9F2",
-    borderWidth: 1,
-    borderColor: "#DDEAD1",
-    borderRadius: 999,
-    paddingLeft: 5,
-    paddingRight: 8,
-    paddingVertical: 5,
-  },
-
-  selectedUserInitial: {
-    width: 22,
-    height: 22,
-    borderRadius: 999,
-    backgroundColor: "#4E7A28",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  selectedUserInitialText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "900",
-  },
-
-  selectedUserName: {
-    maxWidth: 190,
-    fontSize: 12.5,
-    fontWeight: "800",
-    color: "#344054",
-  },
-
-  removeSelectedUserButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  infoBox: {
-    width: "100%",
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "flex-start",
-    backgroundColor: "#FAFBFA",
-    borderWidth: 1,
-    borderColor: "#ECEFF3",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 14,
-    marginBottom: 16,
-  },
-
-  infoText: {
-    flex: 1,
-    fontSize: 12.5,
-    color: "#667085",
-    lineHeight: 18,
-  },
-
-  saveButton: {
-    borderRadius: 16,
-  },
-
-  saveButtonContent: {
-    height: 50,
-  },
-
-  saveButtonLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-
-  cancelButton: {
-    marginTop: 6,
-  },
-
-  selectDialog: {
-    borderRadius: 24,
-    backgroundColor: "#FFFFFF",
-  },
-
-  selectDialogTitle: {
-    fontWeight: "800",
-    color: "#1F2937",
-  },
-
-  selectDialogScrollArea: {
-    paddingHorizontal: 0,
-    maxHeight: 430,
-  },
-
-  selectScroll: {
-    maxHeight: 420,
-  },
-
-  selectScrollContent: {
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    gap: 10,
-  },
-
-  optionItem: {
-    minHeight: 58,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#ECEFF3",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-
-  optionItemPressed: {
-    opacity: 0.9,
-  },
-
-  optionItemSelected: {
-    backgroundColor: "#F6F9F2",
-    borderColor: "#D8E6CD",
-  },
-
-  optionAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#E3ECD9",
-    backgroundColor: "#F6F9F2",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  optionTextWrap: {
-    flex: 1,
-  },
-
-  optionName: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#344054",
-  },
-
-  optionEmail: {
-    fontSize: 12.5,
-    color: "#667085",
-    marginTop: 2,
-  },
-
-  emptyDialogText: {
-    color: "#667085",
-    textAlign: "center",
-    paddingVertical: 20,
-  },
-
-  assignDialogActions: {
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-    justifyContent: "space-between",
-  },
-
-  assignDialogDoneButton: {
-    borderRadius: 14,
-    minWidth: 96,
-  },
-
-  successDialog: {
-    borderRadius: 24,
-    backgroundColor: "#FFFFFF",
-  },
-
-  successDialogContent: {
-    alignItems: "center",
-    paddingTop: 24,
-    paddingBottom: 18,
-  },
-
-  successIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#4E7A28",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
-  },
-
-  successTitle: {
-    fontWeight: "800",
-    color: "#1F2937",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-
-  successText: {
-    color: "#667085",
-    textAlign: "center",
-    lineHeight: 21,
-    marginBottom: 18,
-  },
-
-  successButton: {
-    width: "100%",
-    borderRadius: 16,
-  },
-
-  successButtonContent: {
-    height: 48,
-  },
-});
+function createStyles(palette, isDarkMode) {
+  return StyleSheet.create({
+    flex: {
+      flex: 1,
+    },
+
+    screen: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
+
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: 16,
+    },
+
+    backgroundShapeTop: {
+      position: "absolute",
+      top: -120,
+      right: -70,
+      width: 240,
+      height: 240,
+      borderRadius: 120,
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.08)"
+        : "rgba(209, 107, 24, 0.06)",
+    },
+
+    backgroundShapeBottom: {
+      position: "absolute",
+      bottom: -100,
+      left: -60,
+      width: 220,
+      height: 220,
+      borderRadius: 110,
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.055)"
+        : "rgba(209, 107, 24, 0.045)",
+    },
+
+    headerBlock: {
+      marginBottom: 16,
+    },
+
+    title: {
+      color: palette.text,
+      fontWeight: "900",
+      marginBottom: 8,
+    },
+
+    subtitle: {
+      color: palette.textSecondary,
+      lineHeight: 21,
+      maxWidth: 340,
+    },
+
+    dateInfoCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+      borderRadius: 20,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+      marginBottom: 16,
+      elevation: 2,
+      shadowColor: palette.shadow,
+      shadowOpacity: isDarkMode ? 0.16 : 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+    },
+
+    dateInfoIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 15,
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.11)"
+        : "rgba(209, 107, 24, 0.08)",
+      borderWidth: 1,
+      borderColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.22)"
+        : "rgba(209, 107, 24, 0.18)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    dateInfoTextWrap: {
+      flex: 1,
+    },
+
+    dateInfoLabel: {
+      fontSize: 12,
+      color: palette.textSecondary,
+      fontWeight: "700",
+      marginBottom: 2,
+    },
+
+    dateInfoValue: {
+      fontSize: 15,
+      fontWeight: "900",
+      color: palette.text,
+      textTransform: "capitalize",
+      lineHeight: 20,
+    },
+
+    card: {
+      borderRadius: 24,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+      elevation: 3,
+      shadowColor: palette.shadow,
+      shadowOpacity: isDarkMode ? 0.18 : 0.06,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+    },
+
+    cardContent: {
+      paddingHorizontal: 18,
+      paddingTop: 20,
+      paddingBottom: 18,
+    },
+
+    input: {
+      backgroundColor: palette.inputBg,
+      marginBottom: 14,
+    },
+
+    inputOutline: {
+      borderRadius: 16,
+    },
+
+    inputContent: {
+      minHeight: 54,
+      color: palette.text,
+    },
+
+    textAreaContent: {
+      minHeight: 120,
+      paddingTop: 12,
+    },
+
+    sectionHeader: {
+      marginTop: 2,
+      marginBottom: 10,
+    },
+
+    sectionTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 5,
+    },
+
+    sectionIconWrap: {
+      width: 28,
+      height: 28,
+      borderRadius: 10,
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.11)"
+        : "rgba(209, 107, 24, 0.08)",
+      borderWidth: 1,
+      borderColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.22)"
+        : "rgba(209, 107, 24, 0.18)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    label: {
+      fontWeight: "800",
+      color: palette.text,
+    },
+
+    sectionHint: {
+      fontSize: 12.5,
+      color: palette.textSecondary,
+      lineHeight: 18,
+    },
+
+    selectorTrigger: {
+      minHeight: 62,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: palette.border,
+      backgroundColor: palette.inputBg,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginBottom: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+
+    selectorTriggerPressed: {
+      opacity: 0.9,
+    },
+
+    selectorLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      flex: 1,
+    },
+
+    selectorAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 14,
+      backgroundColor: isDarkMode ? "rgba(255,255,255,0.035)" : "#FAF8F5",
+      borderWidth: 1,
+      borderColor: palette.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    selectorTextWrap: {
+      flex: 1,
+    },
+
+    selectorLabel: {
+      fontSize: 11.5,
+      color: palette.textSecondary,
+      fontWeight: "700",
+      marginBottom: 2,
+    },
+
+    selectorValue: {
+      fontSize: 14.5,
+      fontWeight: "900",
+      color: palette.text,
+    },
+
+    chevronBadge: {
+      width: 32,
+      height: 32,
+      borderRadius: 12,
+      backgroundColor: isDarkMode ? "rgba(255,255,255,0.035)" : "#F8FAFC",
+      borderWidth: 1,
+      borderColor: palette.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    selectedUsersWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: -6,
+      marginBottom: 16,
+    },
+
+    selectedUserChip: {
+      maxWidth: "100%",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.10)"
+        : "rgba(209, 107, 24, 0.08)",
+      borderWidth: 1,
+      borderColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.22)"
+        : "rgba(209, 107, 24, 0.18)",
+      borderRadius: 999,
+      paddingLeft: 5,
+      paddingRight: 8,
+      paddingVertical: 5,
+    },
+
+    selectedUserInitial: {
+      width: 22,
+      height: 22,
+      borderRadius: 999,
+      backgroundColor: palette.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    selectedUserInitialText: {
+      color: "#FFFFFF",
+      fontSize: 10,
+      fontWeight: "900",
+    },
+
+    selectedUserName: {
+      maxWidth: 190,
+      fontSize: 12.5,
+      fontWeight: "800",
+      color: palette.text,
+    },
+
+    removeSelectedUserButton: {
+      width: 20,
+      height: 20,
+      borderRadius: 999,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    infoBox: {
+      width: "100%",
+      flexDirection: "row",
+      gap: 8,
+      alignItems: "flex-start",
+      backgroundColor: isDarkMode ? "rgba(255,255,255,0.035)" : "#FAFBFA",
+      borderWidth: 1,
+      borderColor: palette.border,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 14,
+      marginBottom: 16,
+    },
+
+    infoText: {
+      flex: 1,
+      fontSize: 12.5,
+      color: palette.textSecondary,
+      lineHeight: 18,
+    },
+
+    saveButton: {
+      borderRadius: 16,
+    },
+
+    saveButtonContent: {
+      height: 50,
+    },
+
+    saveButtonLabel: {
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    cancelButton: {
+      marginTop: 6,
+    },
+
+    selectDialog: {
+      borderRadius: 24,
+      backgroundColor: palette.card,
+    },
+
+    selectDialogTitle: {
+      fontWeight: "800",
+      color: palette.text,
+    },
+
+    selectDialogScrollArea: {
+      paddingHorizontal: 0,
+      maxHeight: 430,
+    },
+
+    selectScroll: {
+      maxHeight: 420,
+    },
+
+    selectScrollContent: {
+      paddingHorizontal: 18,
+      paddingVertical: 8,
+      gap: 10,
+    },
+
+    optionItem: {
+      minHeight: 58,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: palette.border,
+      backgroundColor: palette.card,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+
+    optionItemPressed: {
+      opacity: 0.9,
+    },
+
+    optionItemSelected: {
+      backgroundColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.10)"
+        : "rgba(209, 107, 24, 0.08)",
+      borderColor: isDarkMode
+        ? "rgba(240, 138, 43, 0.22)"
+        : "rgba(209, 107, 24, 0.18)",
+    },
+
+    optionAvatar: {
+      width: 38,
+      height: 38,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: palette.border,
+      backgroundColor: isDarkMode ? "rgba(255,255,255,0.035)" : "#FAF8F5",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    optionTextWrap: {
+      flex: 1,
+    },
+
+    optionName: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: "800",
+      color: palette.text,
+    },
+
+    optionEmail: {
+      fontSize: 12.5,
+      color: palette.textSecondary,
+      marginTop: 2,
+    },
+
+    emptyDialogText: {
+      color: palette.textSecondary,
+      textAlign: "center",
+      paddingVertical: 20,
+    },
+
+    assignDialogActions: {
+      paddingHorizontal: 16,
+      paddingBottom: 14,
+      justifyContent: "space-between",
+    },
+
+    assignDialogDoneButton: {
+      borderRadius: 14,
+      minWidth: 96,
+    },
+
+    successDialog: {
+      borderRadius: 24,
+      backgroundColor: palette.card,
+    },
+
+    successDialogContent: {
+      alignItems: "center",
+      paddingTop: 24,
+      paddingBottom: 18,
+    },
+
+    successIconCircle: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: palette.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 14,
+    },
+
+    successTitle: {
+      fontWeight: "800",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: 8,
+    },
+
+    successText: {
+      color: palette.textSecondary,
+      textAlign: "center",
+      lineHeight: 21,
+      marginBottom: 18,
+    },
+
+    successButton: {
+      width: "100%",
+      borderRadius: 16,
+    },
+
+    successButtonContent: {
+      height: 48,
+    },
+  });
+}
