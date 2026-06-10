@@ -86,7 +86,7 @@ export default function NoteFormScreen({ navigation, route }) {
     const [categoryDialogVisible, setCategoryDialogVisible] = useState(false);
     const [successVisible, setSuccessVisible] = useState(false);
 
-    const selectedCategory = getNoteCategoryByKey(categoryKey);
+    const selectedCategory = getNoteCategoryByKey(categoryKey, isDarkMode);
 
     const handleSave = async () => {
         if (!title.trim()) {
@@ -323,58 +323,59 @@ export default function NoteFormScreen({ navigation, route }) {
                 showsVerticalScrollIndicator={false}
                 >
                 {NOTE_CATEGORIES.map((item) => {
-                    const selected = item.key === categoryKey;
+                    const category = getNoteCategoryByKey(item.key, isDarkMode);
+                    const selected = category.key === categoryKey;
 
                     return (
-                    <Pressable
-                        key={item.key}
-                        onPress={() => handleSelectCategory(item)}
-                        style={({ pressed }) => [
-                        styles.categoryOption,
-                        {
-                            backgroundColor: selected
-                            ? item.soft
-                            : isDarkMode
-                            ? "rgba(255,255,255,0.025)"
-                            : "#FFFFFF",
-                            borderColor: selected ? item.border : palette.border,
-                        },
-                        pressed && styles.categoryOptionPressed,
-                        ]}
-                    >
-                        <View
-                        style={[
-                            styles.categoryOptionIcon,
-                            {
-                            backgroundColor: item.soft,
-                            borderColor: item.border,
-                            },
-                        ]}
+                        <Pressable
+                            key={category.key}
+                            onPress={() => handleSelectCategory(category)}
+                            style={({ pressed }) => [
+                                styles.categoryOption,
+                                {
+                                    backgroundColor: selected
+                                        ? category.soft
+                                        : isDarkMode
+                                        ? "rgba(255,255,255,0.025)"
+                                        : "#FFFFFF",
+                                    borderColor: selected ? category.border : palette.border,
+                                },
+                                pressed && styles.categoryOptionPressed,
+                            ]}
                         >
-                        <MaterialCommunityIcons
-                            name={item.icon}
-                            size={18}
-                            color={item.color}
-                        />
-                        </View>
+                            <View
+                                style={[
+                                    styles.categoryOptionIcon,
+                                    {
+                                        backgroundColor: category.soft,
+                                        borderColor: category.border,
+                                    },
+                                ]}
+                            >
+                                <MaterialCommunityIcons
+                                    name={category.icon}
+                                    size={18}
+                                    color={category.color}
+                                />
+                            </View>
 
-                        <Text
-                        style={[
-                            styles.categoryOptionText,
-                            selected && { color: item.color },
-                        ]}
-                        >
-                        {item.label}
-                        </Text>
+                            <Text
+                                style={[
+                                    styles.categoryOptionText,
+                                    selected && { color: category.color },
+                                ]}
+                            >
+                                {category.label}
+                            </Text>
 
-                        {selected ? (
-                        <MaterialCommunityIcons
-                            name="check-circle"
-                            size={20}
-                            color={item.color}
-                        />
-                        ) : null}
-                    </Pressable>
+                            {selected ? (
+                                <MaterialCommunityIcons
+                                    name="check-circle"
+                                    size={20}
+                                    color={category.color}
+                                />
+                            ) : null}
+                        </Pressable>
                     );
                 })}
                 </ScrollView>

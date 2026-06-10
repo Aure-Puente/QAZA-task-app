@@ -96,8 +96,8 @@ export default function NotesScreen({ navigation }) {
   const selectedCategory = useMemo(() => {
     if (!activeCategoryFilter) return null;
 
-    return getNoteCategoryByKey(activeCategoryFilter);
-  }, [activeCategoryFilter]);
+    return getNoteCategoryByKey(activeCategoryFilter, isDarkMode);
+  }, [activeCategoryFilter, isDarkMode]);
 
   const handleToggleCategoryFilter = (categoryKey) => {
     setActiveCategoryFilter((prev) => (prev === categoryKey ? null : categoryKey));
@@ -201,45 +201,46 @@ export default function NotesScreen({ navigation }) {
             </Button>
           </View>
 
-          <View style={styles.categoriesPreview}>
-            {NOTE_CATEGORIES.map((category) => {
-              const selected = activeCategoryFilter === category.key;
+            <View style={styles.categoriesPreview}>
+              {NOTE_CATEGORIES.map((item) => {
+                const category = getNoteCategoryByKey(item.key, isDarkMode);
+                const selected = activeCategoryFilter === category.key;
 
-              return (
-                <Pressable
-                  key={category.key}
-                  onPress={() => handleToggleCategoryFilter(category.key)}
-                  style={({ pressed }) => [
-                    styles.categoryPreviewChip,
-                    {
-                      backgroundColor: selected
-                        ? category.color
-                        : isDarkMode
-                        ? "rgba(255,255,255,0.025)"
-                        : category.soft,
-                      borderColor: selected ? category.color : category.border,
-                    },
-                    pressed && styles.categoryPreviewChipPressed,
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name={selected ? "check-circle" : category.icon}
-                    size={13}
-                    color={selected ? "#FFFFFF" : category.color}
-                  />
-
-                  <Text
-                    style={[
-                      styles.categoryPreviewText,
-                      { color: selected ? "#FFFFFF" : category.color },
+                return (
+                  <Pressable
+                    key={category.key}
+                    onPress={() => handleToggleCategoryFilter(category.key)}
+                    style={({ pressed }) => [
+                      styles.categoryPreviewChip,
+                      {
+                        backgroundColor: selected
+                          ? category.color
+                          : isDarkMode
+                          ? category.soft
+                          : category.soft,
+                        borderColor: selected ? category.color : category.border,
+                      },
+                      pressed && styles.categoryPreviewChipPressed,
                     ]}
                   >
-                    {category.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+                    <MaterialCommunityIcons
+                      name={selected ? "check-circle" : category.icon}
+                      size={13}
+                      color={selected ? "#FFFFFF" : category.color}
+                    />
+
+                    <Text
+                      style={[
+                        styles.categoryPreviewText,
+                        { color: selected ? "#FFFFFF" : category.color },
+                      ]}
+                    >
+                      {category.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
@@ -289,7 +290,7 @@ export default function NotesScreen({ navigation }) {
           ) : (
             <View style={styles.notesList}>
               {filteredNotes.map((note) => {
-                const category = getNoteCategoryByKey(note.categoryKey);
+                const category = getNoteCategoryByKey(note.categoryKey, isDarkMode);
 
                 return (
                   <Pressable

@@ -19,9 +19,15 @@ const DRIVE_FOLDERS = [
         title: "Administración",
         description: "Accedé a documentos, planillas y archivos administrativos.",
         icon: "briefcase-outline",
+
         color: "#C62828",
         soft: "rgba(198, 40, 40, 0.10)",
         border: "rgba(198, 40, 40, 0.22)",
+
+        darkColor: "#FF8A80",
+        darkSoft: "rgba(255, 138, 128, 0.14)",
+        darkBorder: "rgba(255, 138, 128, 0.34)",
+
         url: "https://drive.google.com/drive/folders/1byoUnm-4pJZ45mmlgvKUq7PXosMTA_ni",
     },
     {
@@ -29,9 +35,15 @@ const DRIVE_FOLDERS = [
         title: "Comunicación",
         description: "Materiales, recursos y contenidos del área de comunicación.",
         icon: "message-text-outline",
+
         color: "#7C3AED",
         soft: "rgba(124, 58, 237, 0.11)",
         border: "rgba(124, 58, 237, 0.24)",
+
+        darkColor: "#C4B5FD",
+        darkSoft: "rgba(196, 181, 253, 0.14)",
+        darkBorder: "rgba(196, 181, 253, 0.34)",
+
         url: "https://drive.google.com/drive/folders/1MlTGhDRcjZGM4VAOTT514W8mwHro435U",
     },
     {
@@ -39,9 +51,15 @@ const DRIVE_FOLDERS = [
         title: "Producción",
         description: "Accedé a archivos, recursos y materiales de producción.",
         icon: "package-variant-closed",
+
         color: "#D16B18",
         soft: "rgba(209, 107, 24, 0.11)",
         border: "rgba(209, 107, 24, 0.24)",
+
+        darkColor: "#FDBA74",
+        darkSoft: "rgba(253, 186, 116, 0.15)",
+        darkBorder: "rgba(253, 186, 116, 0.36)",
+
         url: "https://drive.google.com/drive/folders/1O9PplReeUQIGwi0yoeRQt6kqUN2ztfSo",
     },
     {
@@ -49,12 +67,26 @@ const DRIVE_FOLDERS = [
         title: "Biblioteca",
         description: "Consultá recursos, referencias y material de consulta del equipo.",
         icon: "bookshelf",
+
         color: "#B7791F",
         soft: "rgba(183, 121, 31, 0.12)",
         border: "rgba(183, 121, 31, 0.24)",
+
+        darkColor: "#FDE68A",
+        darkSoft: "rgba(253, 230, 138, 0.15)",
+        darkBorder: "rgba(253, 230, 138, 0.34)",
+
         url: "https://drive.google.com/drive/folders/17U_9Lu0OrxKKtZQzPx3GgmuOIq2IbYgb",
     },
 ];
+
+function getFolderColors(folder, isDarkMode) {
+    return {
+        color: isDarkMode ? folder.darkColor : folder.color,
+        soft: isDarkMode ? folder.darkSoft : folder.soft,
+        border: isDarkMode ? folder.darkBorder : folder.border,
+    };
+}
 
 export default function DriveScreen() {
     const theme = useTheme();
@@ -132,7 +164,7 @@ export default function DriveScreen() {
                         <MaterialCommunityIcons
                             name="google-drive"
                             size={28}
-                            color={palette.primary}
+                            color={isDarkMode ? "#FDBA74" : palette.primary}
                         />
                     </View>
 
@@ -157,54 +189,78 @@ export default function DriveScreen() {
                 </View>
 
                 <View style={styles.foldersList}>
-                    {DRIVE_FOLDERS.map((folder) => (
-                        <Pressable
-                            key={folder.id}
-                            onPress={() => handleOpenFolder(folder.url)}
-                            style={({ pressed }) => [
-                                styles.folderPressable,
-                                pressed && styles.folderPressablePressed,
-                            ]}
-                        >
-                            <Card style={styles.folderCard}>
-                                <Card.Content style={styles.folderContent}>
-                                    <View
-                                        style={[
-                                            styles.folderIconWrap,
-                                            {
-                                                backgroundColor: folder.soft,
-                                                borderColor: folder.border,
-                                            },
-                                        ]}
-                                    >
-                                        <MaterialCommunityIcons
-                                            name={folder.icon}
-                                            size={24}
-                                            color={folder.color}
-                                        />
-                                    </View>
+                    {DRIVE_FOLDERS.map((folder) => {
+                        const folderColors = getFolderColors(folder, isDarkMode);
 
-                                    <View style={styles.folderTextWrap}>
-                                        <Text variant="titleMedium" style={styles.folderTitle}>
-                                            {folder.title}
-                                        </Text>
+                        return (
+                            <Pressable
+                                key={folder.id}
+                                onPress={() => handleOpenFolder(folder.url)}
+                                style={({ pressed }) => [
+                                    styles.folderPressable,
+                                    pressed && styles.folderPressablePressed,
+                                ]}
+                            >
+                                <Card style={styles.folderCard}>
+                                    <Card.Content style={styles.folderContent}>
+                                        <View
+                                            style={[
+                                                styles.folderIconWrap,
+                                                {
+                                                    backgroundColor: folderColors.soft,
+                                                    borderColor: folderColors.border,
+                                                },
+                                            ]}
+                                        >
+                                            <MaterialCommunityIcons
+                                                name={folder.icon}
+                                                size={24}
+                                                color={folderColors.color}
+                                            />
+                                        </View>
 
-                                        <Text style={styles.folderDescription}>
-                                            {folder.description}
-                                        </Text>
-                                    </View>
+                                        <View style={styles.folderTextWrap}>
+                                            <Text
+                                                variant="titleMedium"
+                                                style={[
+                                                    styles.folderTitle,
+                                                    isDarkMode && {
+                                                        color: folderColors.color,
+                                                    },
+                                                ]}
+                                            >
+                                                {folder.title}
+                                            </Text>
 
-                                    <View style={styles.openIconWrap}>
-                                        <MaterialCommunityIcons
-                                            name="open-in-new"
-                                            size={21}
-                                            color={palette.textMuted}
-                                        />
-                                    </View>
-                                </Card.Content>
-                            </Card>
-                        </Pressable>
-                    ))}
+                                            <Text style={styles.folderDescription}>
+                                                {folder.description}
+                                            </Text>
+                                        </View>
+
+                                        <View
+                                            style={[
+                                                styles.openIconWrap,
+                                                isDarkMode && {
+                                                    backgroundColor: folderColors.soft,
+                                                    borderColor: folderColors.border,
+                                                },
+                                            ]}
+                                        >
+                                            <MaterialCommunityIcons
+                                                name="open-in-new"
+                                                size={21}
+                                                color={
+                                                    isDarkMode
+                                                        ? folderColors.color
+                                                        : palette.textMuted
+                                                }
+                                            />
+                                        </View>
+                                    </Card.Content>
+                                </Card>
+                            </Pressable>
+                        );
+                    })}
                 </View>
             </ScrollView>
         </View>
@@ -231,7 +287,7 @@ function createStyles(palette, isDarkMode) {
             height: 240,
             borderRadius: 120,
             backgroundColor: isDarkMode
-                ? "rgba(240, 138, 43, 0.08)"
+                ? "rgba(253, 186, 116, 0.08)"
                 : "rgba(209, 107, 24, 0.07)",
         },
 
@@ -243,7 +299,7 @@ function createStyles(palette, isDarkMode) {
             height: 220,
             borderRadius: 110,
             backgroundColor: isDarkMode
-                ? "rgba(240, 138, 43, 0.06)"
+                ? "rgba(196, 181, 253, 0.055)"
                 : "rgba(209, 107, 24, 0.055)",
         },
 
@@ -283,19 +339,13 @@ function createStyles(palette, isDarkMode) {
             shadowOffset: { width: 0, height: 4 },
         },
 
-        infoIconCircle: {
-            width: 58,
-            height: 58,
-            borderRadius: 22,
-            backgroundColor: isDarkMode
-                ? "rgba(240, 138, 43, 0.11)"
-                : "rgba(209, 107, 24, 0.08)",
-            borderWidth: 1,
-            borderColor: isDarkMode
-                ? "rgba(240, 138, 43, 0.22)"
-                : "rgba(209, 107, 24, 0.18)",
-            alignItems: "center",
-            justifyContent: "center",
+        infoAccent: {
+            position: "absolute",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 4,
+            backgroundColor: isDarkMode ? "#FDBA74" : palette.primary,
         },
 
         infoIconCircle: {
@@ -303,11 +353,11 @@ function createStyles(palette, isDarkMode) {
             height: 58,
             borderRadius: 22,
             backgroundColor: isDarkMode
-                ? "rgba(240, 138, 43, 0.10)"
+                ? "rgba(253, 186, 116, 0.14)"
                 : "rgba(209, 107, 24, 0.08)",
             borderWidth: 1,
             borderColor: isDarkMode
-                ? "rgba(240, 138, 43, 0.20)"
+                ? "rgba(253, 186, 116, 0.34)"
                 : "rgba(209, 107, 24, 0.18)",
             alignItems: "center",
             justifyContent: "center",
@@ -320,7 +370,7 @@ function createStyles(palette, isDarkMode) {
 
         infoEyebrow: {
             fontSize: 11.5,
-            color: palette.primary,
+            color: isDarkMode ? "#FDBA74" : palette.primary,
             fontWeight: "800",
             textTransform: "uppercase",
             letterSpacing: 0.4,

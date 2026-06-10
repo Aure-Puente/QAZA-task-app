@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+    Alert,
     Pressable,
     ScrollView,
     StatusBar,
@@ -36,6 +37,11 @@ import {
     toggleTaskCompleted,
     updateTask,
 } from "../services/taskService";
+import {
+    deleteWeeklyObjective,
+    getAllWeeklyObjectives,
+    toggleWeeklyObjectiveCompleted,
+} from "../services/weeklyObjectiveService";
 
 //JS:
 const CALENDAR_VIEW_STORAGE_KEY = "calendar_view_mode";
@@ -296,17 +302,23 @@ function getMonthMatrix(date) {
     const month = baseDate.getMonth();
 
     const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+
     const firstDayWeekIndex = (firstDayOfMonth.getDay() + 6) % 7;
+    const lastDayWeekIndex = (lastDayOfMonth.getDay() + 6) % 7;
 
     const startDate = new Date(firstDayOfMonth);
     startDate.setDate(firstDayOfMonth.getDate() - firstDayWeekIndex);
 
-    const days = [];
+    const endDate = new Date(lastDayOfMonth);
+    endDate.setDate(lastDayOfMonth.getDate() + (6 - lastDayWeekIndex));
 
-    for (let index = 0; index < 42; index += 1) {
-        const day = new Date(startDate);
-        day.setDate(startDate.getDate() + index);
-        days.push(day);
+    const days = [];
+    const cursor = new Date(startDate);
+
+    while (cursor <= endDate) {
+        days.push(new Date(cursor));
+        cursor.setDate(cursor.getDate() + 1);
     }
 
     const weeks = [];
@@ -345,8 +357,9 @@ function CalendarTaskPreview({
     isPastDay = false,
     styles,
     palette,
+    isDarkMode
 }) {
-    const category = getNoteCategoryByKey(task.categoryKey);
+    const category = getNoteCategoryByKey(task.categoryKey, isDarkMode);
     const names = getTaskResponsibleNames(task);
     const visibleNames = names.slice(0, variant === "week" ? 4 : 3);
     const extraNames = Math.max(names.length - visibleNames.length, 0);
@@ -356,8 +369,12 @@ function CalendarTaskPreview({
             style={[
                 variant === "week" ? styles.weekTaskCard : styles.monthTaskCard,
                 {
-                    backgroundColor: isPastDay ? "rgba(148,163,184,0.18)" : category.soft,
-                    borderColor: isPastDay ? "rgba(100,116,139,0.32)" : category.border,
+                    backgroundColor: isPastDay
+                        ? "rgba(148,163,184,0.18)"
+                        : category.soft,
+                    borderColor: isPastDay
+                        ? "rgba(100,116,139,0.32)"
+                        : category.border,
                 },
             ]}
         >
@@ -370,16 +387,21 @@ function CalendarTaskPreview({
                                 ? styles.weekTaskInitial
                                 : styles.monthTaskInitial,
                             {
-                                backgroundColor: isPastDay ? "#64748B" : category.color,
+                                backgroundColor: isPastDay
+                                    ? "#64748B"
+                                    : category.color,
                             },
                         ]}
                     >
                         <Text
-                            style={
+                            style={[
                                 variant === "week"
                                     ? styles.weekTaskInitialText
-                                    : styles.monthTaskInitialText
-                            }
+                                    : styles.monthTaskInitialText,
+                                {
+                                    color: isPastDay ? "#FFFFFF" : category.textOnColor,
+                                },
+                            ]}
                         >
                             {getInitials(name)}
                         </Text>
@@ -398,11 +420,12 @@ function CalendarTaskPreview({
                         ]}
                     >
                         <Text
-                            style={
+                            style={[
                                 variant === "week"
                                     ? styles.weekTaskInitialText
-                                    : styles.monthTaskInitialText
-                            }
+                                    : styles.monthTaskInitialText,
+                                { color: "#FFFFFF" },
+                            ]}
                         >
                             +{extraNames}
                         </Text>
@@ -437,11 +460,14 @@ function MonthDayCell({
     dayCellHeight,
     styles,
     palette,
+    isDarkMode,
+    maxVisibleTasks = 3,
+    taskVariant = "month",
 }) {
     const dateKey = toDateKey(date);
     const dayTasks = tasksByDate[dateKey] || [];
-    const visibleTasks = dayTasks.slice(0, 3);
-    const hiddenCount = Math.max(dayTasks.length - 3, 0);
+    const visibleTasks = dayTasks.slice(0, maxVisibleTasks);
+    const hiddenCount = Math.max(dayTasks.length - maxVisibleTasks, 0);
 
     const isSelected = selectedDate === dateKey;
     const isToday = todayKey === dateKey;
@@ -486,10 +512,11 @@ function MonthDayCell({
                     <CalendarTaskPreview
                         key={task.id}
                         task={task}
-                        variant="month"
+                        variant={taskVariant}
                         isPastDay={isPastDay}
                         styles={styles}
                         palette={palette}
+                        isDarkMode={isDarkMode}
                     />
                 ))}
 
@@ -515,73 +542,415 @@ function MonthDayCell({
     );
 }
 
-function WeekDayColumn({
-    date,
-    selectedDate,
-    todayKey,
-    tasksByDate,
-    onPressDay,
-    dayColumnWidth,
-    styles,
-    palette,
-}) {
-    const dateKey = toDateKey(date);
-    const dayTasks = tasksByDate[dateKey] || [];
-    const isSelected = selectedDate === dateKey;
-    const isToday = todayKey === dateKey;
-    const isPastDay = isDateBeforeToday(dateKey, todayKey);
-    const hasPinnedTask = dayTasks.some((task) => !!task?.isPinned);
+function getObjectiveStartDate(objective) {
+    if (objective?.startDateTimestamp) {
+        const date = new Date(objective.startDateTimestamp);
+        return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    if (objective?.startDate) {
+        const date = getDateFromKey(objective.startDate);
+        return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    return null;
+}
+
+function getObjectiveEndDate(objective) {
+    if (objective?.endDateTimestamp) {
+        const date = new Date(objective.endDateTimestamp);
+        return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    if (objective?.endDate) {
+        const date = getDateFromKey(objective.endDate);
+        return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    return null;
+}
+
+function getObjectiveResponsibleNames(objective) {
+    const possibleArrays = [
+        objective?.assignedUsers,
+        objective?.assignedToUsers,
+        objective?.assignedToList,
+        objective?.responsables,
+        objective?.assignedToNames,
+    ];
+
+    for (const possibleArray of possibleArrays) {
+        if (Array.isArray(possibleArray) && possibleArray.length > 0) {
+            const names = possibleArray
+                .map((item) => normalizeResponsibleName(item))
+                .filter(Boolean);
+
+            if (names.length > 0) return names;
+        }
+    }
+
+    if (objective?.assignedToName) return [objective.assignedToName];
+
+    return ["?"];
+}
+
+function getObjectiveResponsibleIds(objective) {
+    const ids = [];
+
+    if (objective?.assignedTo) ids.push(String(objective.assignedTo));
+
+    const possibleArrays = [
+        objective?.assignedUsers,
+        objective?.assignedToUsers,
+        objective?.assignedToList,
+        objective?.responsables,
+    ];
+
+    possibleArrays.forEach((possibleArray) => {
+        if (!Array.isArray(possibleArray)) return;
+
+        possibleArray.forEach((item) => {
+            if (typeof item === "string") {
+                ids.push(String(item));
+                return;
+            }
+
+            if (item?.uid) ids.push(String(item.uid));
+            if (item?.id) ids.push(String(item.id));
+            if (item?.userId) ids.push(String(item.userId));
+        });
+    });
+
+    return [...new Set(ids)];
+}
+
+function isObjectiveAssignedToUser(objective, userId) {
+    if (!userId) return false;
+
+    const responsibleIds = getObjectiveResponsibleIds(objective);
+    return responsibleIds.some((id) => String(id) === String(userId));
+}
+
+function normalizeObjectiveForCalendar(objective) {
+    const startDate = getObjectiveStartDate(objective);
+    const endDate = getObjectiveEndDate(objective);
+
+    if (!startDate || !endDate) return null;
+
+    const normalizedStart = new Date(startDate);
+    normalizedStart.setHours(0, 0, 0, 0);
+
+    const normalizedEnd = new Date(endDate);
+    normalizedEnd.setHours(23, 59, 59, 999);
+
+    return {
+        ...objective,
+        startDateObject: normalizedStart,
+        endDateObject: normalizedEnd,
+        startDateKey: toDateKey(normalizedStart),
+        endDateKey: toDateKey(normalizedEnd),
+    };
+}
+
+function doesObjectiveIncludeDate(objective, dateKey) {
+    if (!objective?.startDateKey || !objective?.endDateKey || !dateKey) return false;
+
+    return String(objective.startDateKey) <= String(dateKey) && String(dateKey) <= String(objective.endDateKey);
+}
+
+function getObjectiveSegmentsForWeek({ objectives, week, cellWidth, maxVisible = 2 }) {
+    if (!Array.isArray(objectives) || !Array.isArray(week) || week.length === 0) {
+        return { segments: [], hiddenCount: 0 };
+    }
+
+    const weekStartKey = toDateKey(week[0]);
+    const weekEndKey = toDateKey(week[week.length - 1]);
+
+    const weekObjectives = objectives
+        .filter((objective) => {
+            if (!objective?.startDateKey || !objective?.endDateKey) return false;
+            return objective.startDateKey <= weekEndKey && objective.endDateKey >= weekStartKey;
+        })
+        .sort((a, b) => {
+            if (a.startDateKey !== b.startDateKey) return a.startDateKey.localeCompare(b.startDateKey);
+            return a.endDateKey.localeCompare(b.endDateKey);
+        });
+
+    const visibleObjectives = weekObjectives.slice(0, maxVisible);
+
+    const segments = visibleObjectives.map((objective, index) => {
+        let startIndex = 0;
+        let endIndex = week.length - 1;
+
+        week.forEach((day, dayIndex) => {
+            const dayKey = toDateKey(day);
+
+            if (dayKey === objective.startDateKey || (dayKey > objective.startDateKey && dayIndex === 0)) {
+                startIndex = Math.max(startIndex, dayIndex);
+            }
+
+            if (dayKey <= objective.endDateKey) {
+                endIndex = dayIndex;
+            }
+        });
+
+        const left = startIndex * cellWidth + 3;
+        const width = Math.max((endIndex - startIndex + 1) * cellWidth - 6, 24);
+
+        return {
+            objective,
+            left,
+            width,
+            top: 28 + index * 22,
+        };
+    });
+
+    return {
+        segments,
+        hiddenCount: Math.max(weekObjectives.length - visibleObjectives.length, 0),
+    };
+}
+
+function WeeklyObjectiveBar({ objective, left, width, top, styles, onPress , isDarkMode}) {
+    const category = getNoteCategoryByKey(objective.categoryKey, isDarkMode);
+    const names = getObjectiveResponsibleNames(objective);
+    const visibleNames = names.slice(0, 3);
+    const extraNames = Math.max(names.length - visibleNames.length, 0);
 
     return (
         <Pressable
-            onPress={() => onPressDay(dateKey)}
+            onPress={() => onPress(objective)}
             style={({ pressed }) => [
-                styles.weekDayColumn,
+                styles.weeklyObjectiveBar,
                 {
-                    width: dayColumnWidth,
+                    left,
+                    width,
+                    top,
+                    backgroundColor: category.color,
+                    borderColor: category.color,
                 },
-                isPastDay && styles.weekDayColumnPast,
-                isSelected && styles.weekDayColumnSelected,
-                isToday && styles.weekDayColumnToday,
-                pressed && styles.weekDayColumnPressed,
+                pressed && styles.weeklyObjectiveBarPressed,
             ]}
         >
-            {hasPinnedTask ? (
-                <View style={styles.weekPinnedBadge}>
-                    <MaterialCommunityIcons name="star" size={9} color="#FFFFFF" />
-                </View>
-            ) : null}
+            <View style={styles.weeklyObjectiveInitialsRow}>
+                {visibleNames.map((name, index) => (
+                    <View
+                        key={`${objective.id}-${name}-${index}`}
+                        style={[
+                            styles.weeklyObjectiveInitial,
+                            { marginLeft: index === 0 ? 0 : -5 },
+                        ]}
+                    >
+                        <Text
+                            style={[
+                                styles.weeklyObjectiveInitialText,
+                                { color: category.textOnColor },
+                            ]}
+                        >
+                            {getInitials(name)}
+                        </Text>
+                    </View>
+                ))}
+
+                {extraNames > 0 ? (
+                    <View style={[styles.weeklyObjectiveInitial, { marginLeft: -5 }]}>
+                        <Text
+                            style={[
+                                styles.weeklyObjectiveInitialText,
+                                { color: category.textOnColor },
+                            ]}
+                        >
+                            +{extraNames}
+                        </Text>                    
+                    </View>
+                ) : null}
+            </View>
 
             <Text
-                style={[
-                    styles.weekDayNumber,
-                    isPastDay && styles.weekDayNumberPast,
-                    isToday && styles.weekDayNumberToday,
-                ]}
+                style={styles.weeklyObjectiveTitle}
+                numberOfLines={1}
+                ellipsizeMode="tail"
             >
-                {date.getDate()}
+                {objective.title || "Objetivo semanal"}
             </Text>
-
-            <View style={styles.weekTasksWrap}>
-                {dayTasks.length > 0 ? (
-                    dayTasks.map((task) => (
-                        <CalendarTaskPreview
-                            key={task.id}
-                            task={task}
-                            variant="week"
-                            isPastDay={isPastDay}
-                            styles={styles}
-                            palette={palette}
-                        />
-                    ))
-                ) : (
-                    <View style={styles.weekEmptySpace} />
-                )}
-            </View>
         </Pressable>
     );
 }
 
+    function MonthWeekRowWithObjectives({
+        week,
+        currentMonthDate,
+        selectedDate,
+        todayKey,
+        tasksByDate,
+        objectives,
+        onPressDay,
+        onPressObjective,
+        dayCellWidth,
+        dayCellHeight,
+        styles,
+        palette,
+        isDarkMode,
+        maxVisibleTasks = 3,
+        taskVariant = "month",
+    }) {
+    const { segments, hiddenCount } = getObjectiveSegmentsForWeek({
+        objectives,
+        week,
+        cellWidth: dayCellWidth,
+        maxVisible: 2,
+    });
+
+    return (
+        <View style={[styles.monthWeekRowWrapper, { height: dayCellHeight }]}>
+            <View style={styles.monthWeekRow}>
+                {week.map((date) => (
+                    <MonthDayCell
+                        key={toDateKey(date)}
+                        date={date}
+                        currentMonthDate={currentMonthDate}
+                        selectedDate={selectedDate}
+                        todayKey={todayKey}
+                        tasksByDate={tasksByDate}
+                        onPressDay={onPressDay}
+                        dayCellWidth={dayCellWidth}
+                        dayCellHeight={dayCellHeight}
+                        styles={styles}
+                        palette={palette}
+                        isDarkMode={isDarkMode}
+                        maxVisibleTasks={maxVisibleTasks}
+                        taskVariant={taskVariant}
+                    />
+                ))}
+            </View>
+
+            <View pointerEvents="box-none" style={styles.weeklyObjectivesLayer}>
+                {segments.map((segment) => (
+                    <WeeklyObjectiveBar
+                        key={`${segment.objective.id}-${toDateKey(week[0])}`}
+                        objective={segment.objective}
+                        left={segment.left}
+                        width={segment.width}
+                        top={segment.top}
+                        styles={styles}
+                        onPress={onPressObjective}
+                        isDarkMode={isDarkMode}
+                    />
+                ))}
+
+                {hiddenCount > 0 ? (
+                    <View style={styles.weeklyObjectiveHiddenBadge}>
+                        <Text style={styles.weeklyObjectiveHiddenText}>+{hiddenCount}</Text>
+                    </View>
+                ) : null}
+            </View>
+        </View>
+    );
+}
+
+function SelectedObjectiveCard({
+    objective,
+    styles,
+    palette,
+    onEdit,
+    onComplete,
+    onDelete,
+    updating,
+    deleting,
+    isDarkMode
+}) {
+    const category = getNoteCategoryByKey(objective.categoryKey, isDarkMode);
+    const responsibleNames = getObjectiveResponsibleNames(objective);
+
+    return (
+        <View style={[styles.objectiveModalCard, { borderColor: category.border, backgroundColor: category.soft }]}>
+            <View style={styles.objectiveModalTop}>
+                <View style={styles.objectiveModalInitialsRow}>
+                    {responsibleNames.slice(0, 3).map((name, index) => (
+                        <View
+                            key={`${objective.id}-modal-${name}-${index}`}
+                            style={[
+                                styles.objectiveModalInitial,
+                                {
+                                    backgroundColor: category.color,
+                                    marginLeft: index === 0 ? 0 : -8,
+                                },
+                            ]}
+                        >
+                            <Text
+                                style={[
+                                    styles.objectiveModalInitialText,
+                                    { color: category.textOnColor },
+                                ]}
+                            >
+                                {getInitials(name)}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+
+                <View style={styles.objectiveModalTitleWrap}>
+                    <Text style={[styles.objectiveModalTitle, { color: category.color }]} numberOfLines={2}>
+                        {objective.title || "Objetivo semanal"}
+                    </Text>
+                    <Text style={styles.objectiveModalSubtitle} numberOfLines={1}>
+                        {responsibleNames.join(", ")}
+                    </Text>
+                </View>
+            </View>
+
+            <View style={styles.secondaryActionsBar}>
+                <Pressable
+                    onPress={() => onEdit(objective)}
+                    disabled={updating || deleting}
+                    style={({ pressed }) => [
+                        styles.secondaryActionButton,
+                        pressed && styles.secondaryActionButtonPressed,
+                    ]}
+                >
+                    <MaterialCommunityIcons name="pencil-outline" size={16} color="#2563EB" />
+                    <Text style={[styles.secondaryActionText, { color: "#2563EB" }]}>Editar</Text>
+                </Pressable>
+
+                <View style={styles.secondaryActionsDivider} />
+
+                <Pressable
+                    onPress={() => onComplete(objective)}
+                    disabled={updating || deleting}
+                    style={({ pressed }) => [
+                        styles.secondaryActionButton,
+                        pressed && styles.secondaryActionButtonPressed,
+                    ]}
+                >
+                    {updating ? (
+                        <ActivityIndicator size={14} color={palette.success} />
+                    ) : (
+                        <MaterialCommunityIcons name="check-circle-outline" size={16} color={palette.success} />
+                    )}
+                    <Text style={[styles.secondaryActionText, { color: palette.success }]}>Finalizar</Text>
+                </Pressable>
+
+                <View style={styles.secondaryActionsDivider} />
+
+                <Pressable
+                    onPress={() => onDelete(objective)}
+                    disabled={updating || deleting}
+                    style={({ pressed }) => [
+                        styles.secondaryActionButton,
+                        pressed && styles.secondaryActionButtonPressed,
+                    ]}
+                >
+                    {deleting ? (
+                        <ActivityIndicator size={14} color={palette.danger} />
+                    ) : (
+                        <MaterialCommunityIcons name="trash-can-outline" size={16} color={palette.danger} />
+                    )}
+                    <Text style={[styles.secondaryActionText, { color: palette.danger }]}>Eliminar</Text>
+                </Pressable>
+            </View>
+        </View>
+    );
+}
 export default function CalendarScreen({ navigation }) {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
@@ -628,7 +997,7 @@ export default function CalendarScreen({ navigation }) {
     }, [width]);
 
     const dayCellHeight = useMemo(() => {
-        return 132;
+        return 164;
     }, []);
 
     const weekColumnWidth = useMemo(() => {
@@ -637,6 +1006,7 @@ export default function CalendarScreen({ navigation }) {
     }, [width]);
 
     const [tasks, setTasks] = useState([]);
+    const [weeklyObjectives, setWeeklyObjectives] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
@@ -647,8 +1017,14 @@ export default function CalendarScreen({ navigation }) {
     const [deletingTaskId, setDeletingTaskId] = useState(null);
     const [reordering, setReordering] = useState(false);
 
+    const [updatingObjectiveId, setUpdatingObjectiveId] = useState(null);
+    const [deletingObjectiveId, setDeletingObjectiveId] = useState(null);
+
     const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
     const [taskToDelete, setTaskToDelete] = useState(null);
+
+    const [deleteObjectiveDialogVisible, setDeleteObjectiveDialogVisible] = useState(false);
+    const [objectiveToDelete, setObjectiveToDelete] = useState(null);
 
     const [ownerFilter, setOwnerFilter] = useState(null);
     const [categoryFilter, setCategoryFilter] = useState(null);
@@ -686,22 +1062,31 @@ export default function CalendarScreen({ navigation }) {
         saveCalendarViewMode(mode);
     };
 
-    const loadTasks = useCallback(async () => {
+    const loadCalendarData = useCallback(async () => {
         try {
             setLoading(true);
 
-            const data = await getAllTasks();
-            const safeTasks = Array.isArray(data) ? data.filter(Boolean) : [];
+            const [tasksData, objectivesData] = await Promise.all([
+                getAllTasks(),
+                getAllWeeklyObjectives(),
+            ]);
+
+            const safeTasks = Array.isArray(tasksData) ? tasksData.filter(Boolean) : [];
+            const safeObjectives = Array.isArray(objectivesData)
+                ? objectivesData.filter(Boolean)
+                : [];
 
             setTasks(safeTasks);
+            setWeeklyObjectives(safeObjectives);
 
             await syncTaskNotificationsForUser({
                 tasks: safeTasks,
                 userId: user?.uid,
             });
         } catch (error) {
-            console.log("LOAD TASKS CALENDAR ERROR:", error);
+            console.log("LOAD CALENDAR DATA ERROR:", error);
             setTasks([]);
+            setWeeklyObjectives([]);
         } finally {
             setLoading(false);
         }
@@ -710,9 +1095,9 @@ export default function CalendarScreen({ navigation }) {
     useFocusEffect(
         useCallback(() => {
             if (user?.uid) {
-                loadTasks();
+                loadCalendarData();
             }
-        }, [user?.uid, loadTasks])
+        }, [user?.uid, loadCalendarData])
     );
 
     const datedTasks = useMemo(() => {
@@ -750,6 +1135,39 @@ export default function CalendarScreen({ navigation }) {
         });
     }, [datedTasks, ownerFilter, categoryFilter, user?.uid]);
 
+    const normalizedObjectives = useMemo(() => {
+        return (weeklyObjectives || [])
+            .map((objective) => normalizeObjectiveForCalendar(objective))
+            .filter(Boolean)
+            .filter((objective) => !objective.completed)
+            .filter((objective) => String(objective.endDateKey) >= String(todayKey))
+            .sort((a, b) => {
+                if (a.startDateKey !== b.startDateKey) {
+                    return a.startDateKey.localeCompare(b.startDateKey);
+                }
+
+                return a.endDateKey.localeCompare(b.endDateKey);
+            });
+    }, [weeklyObjectives, todayKey]);
+
+    const filteredObjectives = useMemo(() => {
+        return normalizedObjectives.filter((objective) => {
+            if (ownerFilter === "mine") {
+                if (!isObjectiveAssignedToUser(objective, user?.uid)) return false;
+            }
+
+            if (ownerFilter === "others") {
+                if (isObjectiveAssignedToUser(objective, user?.uid)) return false;
+            }
+
+            if (categoryFilter) {
+                if (String(objective.categoryKey) !== String(categoryFilter)) return false;
+            }
+
+            return true;
+        });
+    }, [normalizedObjectives, ownerFilter, categoryFilter, user?.uid]);
+
     const tasksByDate = useMemo(() => {
         return filteredTasks.reduce((acc, task) => {
             if (!acc[task.dateKey]) {
@@ -766,11 +1184,17 @@ export default function CalendarScreen({ navigation }) {
         return tasksByDate[selectedDate] || [];
     }, [tasksByDate, selectedDate]);
 
+    const selectedObjectives = useMemo(() => {
+        return filteredObjectives.filter((objective) =>
+            doesObjectiveIncludeDate(objective, selectedDate)
+        );
+    }, [filteredObjectives, selectedDate]);
+
     const selectedCategory = useMemo(() => {
         if (!categoryFilter) return null;
 
-        return getNoteCategoryByKey(categoryFilter);
-    }, [categoryFilter]);
+        return getNoteCategoryByKey(categoryFilter, isDarkMode);
+    }, [categoryFilter, isDarkMode]);
 
     const monthWeeks = useMemo(() => {
         return getMonthMatrix(currentMonthDate);
@@ -793,6 +1217,25 @@ export default function CalendarScreen({ navigation }) {
     const handleCreateTaskForSelectedDate = () => {
         setDialogVisible(false);
         navigation.navigate("Crear tarea", { selectedDate });
+    };
+
+    const handleCreateWeeklyObjectiveForSelectedDate = () => {
+        setDialogVisible(false);
+        navigation.navigate("Crear objetivo semanal", { selectedDate });
+    };
+
+    const handleEditWeeklyObjective = (objective) => {
+        if (!objective?.id) return;
+
+        setDialogVisible(false);
+
+        navigation.navigate("Editar objetivo semanal", {
+            objective,
+        });
+    };
+
+    const handlePressWeeklyObjective = (objective) => {
+        handleEditWeeklyObjective(objective);
     };
 
     const handleToggleOwnerFilter = (value) => {
@@ -855,7 +1298,7 @@ export default function CalendarScreen({ navigation }) {
                 await cancelTaskNotification(task.id);
             }
 
-            await loadTasks();
+            await loadCalendarData();
         } catch (error) {
             console.log("TOGGLE TASK CALENDAR ERROR:", error);
         } finally {
@@ -868,17 +1311,20 @@ export default function CalendarScreen({ navigation }) {
 
         try {
             setPinningTaskId(task.id);
+
             await updateTask(task.id, {
                 isPinned: !task.isPinned,
             });
-            await loadTasks();
+
+            await loadCalendarData();
         } catch (error) {
             console.log("TOGGLE PINNED TASK ERROR:", error);
         } finally {
             setPinningTaskId(null);
         }
     };
-        const handleAskDeleteTask = (task) => {
+
+    const handleAskDeleteTask = (task) => {
         if (!task?.id) return;
 
         setTaskToDelete(task);
@@ -918,11 +1364,72 @@ export default function CalendarScreen({ navigation }) {
             setDeleteDialogVisible(false);
             setTaskToDelete(null);
 
-            await loadTasks();
+            await loadCalendarData();
         } catch (error) {
             console.log("DELETE TASK ERROR:", error);
         } finally {
             setDeletingTaskId(null);
+        }
+    };
+
+    const handleCompleteWeeklyObjective = async (objective) => {
+        if (!objective?.id) return;
+
+        try {
+            setUpdatingObjectiveId(objective.id);
+
+            await toggleWeeklyObjectiveCompleted(objective.id, true);
+
+            setWeeklyObjectives((prevObjectives) =>
+                prevObjectives.filter((item) => String(item.id) !== String(objective.id))
+            );
+
+            await loadCalendarData();
+        } catch (error) {
+            console.log("COMPLETE WEEKLY OBJECTIVE ERROR:", error);
+            Alert.alert("Error", "No se pudo finalizar el objetivo semanal.");
+        } finally {
+            setUpdatingObjectiveId(null);
+        }
+    };
+
+    const handleAskDeleteWeeklyObjective = (objective) => {
+        if (!objective?.id) return;
+
+        setObjectiveToDelete(objective);
+        setDeleteObjectiveDialogVisible(true);
+    };
+
+    const handleCloseDeleteObjectiveDialog = () => {
+        if (deletingObjectiveId) return;
+
+        setDeleteObjectiveDialogVisible(false);
+        setObjectiveToDelete(null);
+    };
+
+    const handleConfirmDeleteWeeklyObjective = async () => {
+        if (!objectiveToDelete?.id) return;
+
+        try {
+            setDeletingObjectiveId(objectiveToDelete.id);
+
+            await deleteWeeklyObjective(objectiveToDelete.id);
+
+            setWeeklyObjectives((prevObjectives) =>
+                prevObjectives.filter(
+                    (objective) => String(objective.id) !== String(objectiveToDelete.id)
+                )
+            );
+
+            setDeleteObjectiveDialogVisible(false);
+            setObjectiveToDelete(null);
+
+            await loadCalendarData();
+        } catch (error) {
+            console.log("DELETE WEEKLY OBJECTIVE ERROR:", error);
+            Alert.alert("Error", "No se pudo eliminar el objetivo semanal.");
+        } finally {
+            setDeletingObjectiveId(null);
         }
     };
 
@@ -955,7 +1462,7 @@ export default function CalendarScreen({ navigation }) {
                 )
             );
 
-            await loadTasks();
+            await loadCalendarData();
         } catch (error) {
             console.log("REORDER TASKS ERROR:", error);
         } finally {
@@ -963,14 +1470,43 @@ export default function CalendarScreen({ navigation }) {
         }
     };
 
+            const renderSelectedObjectivesHeader = () => {
+            if (selectedObjectives.length === 0) return null;
+
+            return (
+                <View style={styles.selectedObjectivesWrap}>
+                    <Text style={styles.selectedObjectivesTitle}>
+                        Objetivos semanales
+                    </Text>
+
+                    {selectedObjectives.map((objective) => (
+                        <SelectedObjectiveCard
+                            key={objective.id}
+                            objective={objective}
+                            styles={styles}
+                            palette={palette}
+                            updating={updatingObjectiveId === objective.id}
+                            deleting={deletingObjectiveId === objective.id}
+                            onEdit={handleEditWeeklyObjective}
+                            onComplete={handleCompleteWeeklyObjective}
+                            onDelete={handleAskDeleteWeeklyObjective}
+                            isDarkMode={isDarkMode}
+                        />
+                    ))}
+                </View>
+            );
+};
+
+
     const renderTaskItem = ({ item: task, drag, isActive }) => {
-        const category = getNoteCategoryByKey(task.categoryKey);
+        const category = getNoteCategoryByKey(task.categoryKey, isDarkMode);
         const statusMeta = getTaskStatusMeta(task);
         const responsibleNames = getTaskResponsibleNames(task);
 
         const isUpdating = updatingTaskId === task.id;
         const isPinning = pinningTaskId === task.id;
         const isDeleting = deletingTaskId === task.id;
+
 
         return (
             <ScaleDecorator>
@@ -997,7 +1533,12 @@ export default function CalendarScreen({ navigation }) {
                                         },
                                     ]}
                                 >
-                                    <Text style={styles.taskAvatarText}>
+                                    <Text
+                                        style={[
+                                            styles.taskAvatarText,
+                                            { color: category.textOnColor },
+                                        ]}
+                                    >
                                         {getInitials(name)}
                                     </Text>
                                 </View>
@@ -1013,7 +1554,12 @@ export default function CalendarScreen({ navigation }) {
                                         },
                                     ]}
                                 >
-                                    <Text style={styles.taskAvatarText}>
+                                    <Text
+                                        style={[
+                                            styles.taskAvatarText,
+                                            { color: "#FFFFFF" },
+                                        ]}
+                                    >
                                         +{responsibleNames.length - 3}
                                     </Text>
                                 </View>
@@ -1259,7 +1805,7 @@ export default function CalendarScreen({ navigation }) {
                         </Text>
 
                         <Text variant="bodyMedium" style={styles.subtitle}>
-                            Visualizá las tareas pendientes por día, responsable y categoría.
+                            Visualizá las tareas pendientes y objetivos semanales por día, responsable y categoría.
                         </Text>
                     </View>
 
@@ -1509,7 +2055,9 @@ export default function CalendarScreen({ navigation }) {
                                 <View style={styles.loadingBox}>
                                     <ActivityIndicator size="small" color={palette.primary} />
 
-                                    <Text style={styles.loadingText}>Cargando tareas...</Text>
+                                    <Text style={styles.loadingText}>
+                                        Cargando calendario...
+                                    </Text>
                                 </View>
                             ) : calendarViewMode === CALENDAR_VIEW_MODES.MONTH ? (
                                 <View style={styles.monthCalendar}>
@@ -1528,23 +2076,22 @@ export default function CalendarScreen({ navigation }) {
                                     </View>
 
                                     {monthWeeks.map((week, weekIndex) => (
-                                        <View key={`week-${weekIndex}`} style={styles.monthWeekRow}>
-                                            {week.map((date) => (
-                                                <MonthDayCell
-                                                    key={toDateKey(date)}
-                                                    date={date}
-                                                    currentMonthDate={currentMonthDate}
-                                                    selectedDate={selectedDate}
-                                                    todayKey={todayKey}
-                                                    tasksByDate={tasksByDate}
-                                                    onPressDay={handleDayPress}
-                                                    dayCellWidth={dayCellWidth}
-                                                    dayCellHeight={dayCellHeight}
-                                                    styles={styles}
-                                                    palette={palette}
-                                                />
-                                            ))}
-                                        </View>
+                                        <MonthWeekRowWithObjectives
+                                            key={`week-${weekIndex}`}
+                                            week={week}
+                                            currentMonthDate={currentMonthDate}
+                                            selectedDate={selectedDate}
+                                            todayKey={todayKey}
+                                            tasksByDate={tasksByDate}
+                                            objectives={filteredObjectives}
+                                            onPressDay={handleDayPress}
+                                            onPressObjective={handlePressWeeklyObjective}
+                                            dayCellWidth={dayCellWidth}
+                                            dayCellHeight={dayCellHeight}
+                                            styles={styles}
+                                            palette={palette}
+                                            isDarkMode={false}
+                                        />
                                     ))}
                                 </View>
                             ) : (
@@ -1570,21 +2117,22 @@ export default function CalendarScreen({ navigation }) {
                                             ))}
                                         </View>
 
-                                        <View style={styles.weekColumnsRow}>
-                                            {weekDays.map((date) => (
-                                                <WeekDayColumn
-                                                    key={toDateKey(date)}
-                                                    date={date}
-                                                    selectedDate={selectedDate}
-                                                    todayKey={todayKey}
-                                                    tasksByDate={tasksByDate}
-                                                    onPressDay={handleDayPress}
-                                                    dayColumnWidth={weekColumnWidth}
-                                                    styles={styles}
-                                                    palette={palette}
-                                                />
-                                            ))}
-                                        </View>
+                                        <MonthWeekRowWithObjectives
+                                            week={weekDays}
+                                            currentMonthDate={currentWeekDate}
+                                            selectedDate={selectedDate}
+                                            todayKey={todayKey}
+                                            tasksByDate={tasksByDate}
+                                            objectives={filteredObjectives}
+                                            onPressDay={handleDayPress}
+                                            onPressObjective={handlePressWeeklyObjective}
+                                            dayCellWidth={weekColumnWidth}
+                                            dayCellHeight={420}
+                                            styles={styles}
+                                            palette={palette}
+                                            maxVisibleTasks={999}
+                                            taskVariant="week"
+                                        />
                                     </View>
                                 </ScrollView>
                             )}
@@ -1610,21 +2158,22 @@ export default function CalendarScreen({ navigation }) {
                             showsVerticalScrollIndicator={false}
                         >
                             {NOTE_CATEGORIES.map((item) => {
+                                const category = getNoteCategoryByKey(item.key, isDarkMode);
                                 const selected = item.key === categoryFilter;
 
                                 return (
                                     <Pressable
-                                        key={item.key}
-                                        onPress={() => handleSelectCategoryFilter(item.key)}
+                                        key={category.key}
+                                        onPress={() => handleSelectCategoryFilter(category.key)}
                                         style={({ pressed }) => [
                                             styles.categoryOption,
                                             {
                                                 backgroundColor: selected
-                                                    ? item.soft
+                                                    ? category.soft
                                                     : isDarkMode
                                                     ? "rgba(255,255,255,0.025)"
                                                     : "#FFFFFF",
-                                                borderColor: selected ? item.border : palette.border,
+                                                borderColor: selected ? category.border : palette.border,
                                             },
                                             pressed && styles.categoryOptionPressed,
                                         ]}
@@ -1633,32 +2182,32 @@ export default function CalendarScreen({ navigation }) {
                                             style={[
                                                 styles.categoryOptionIcon,
                                                 {
-                                                    backgroundColor: item.soft,
-                                                    borderColor: item.border,
+                                                    backgroundColor: category.soft,
+                                                    borderColor: category.border,
                                                 },
                                             ]}
                                         >
                                             <MaterialCommunityIcons
-                                                name={item.icon}
+                                                name={category.icon}
                                                 size={18}
-                                                color={item.color}
+                                                color={category.color}
                                             />
                                         </View>
 
                                         <Text
                                             style={[
                                                 styles.categoryOptionText,
-                                                selected && { color: item.color },
+                                                selected && { color: category.color },
                                             ]}
                                         >
-                                            {item.label}
+                                            {category.label}
                                         </Text>
 
                                         {selected ? (
                                             <MaterialCommunityIcons
                                                 name="check-circle"
                                                 size={20}
-                                                color={item.color}
+                                                color={category.color}
                                             />
                                         ) : null}
                                     </Pressable>
@@ -1666,8 +2215,7 @@ export default function CalendarScreen({ navigation }) {
                             })}
                         </ScrollView>
                     </Dialog.ScrollArea>
-
-                    <Dialog.Actions>
+                                        <Dialog.Actions>
                         {categoryFilter ? (
                             <Button
                                 onPress={() => {
@@ -1724,6 +2272,7 @@ export default function CalendarScreen({ navigation }) {
                                 style={styles.dragList}
                                 contentContainerStyle={styles.dialogScrollContent}
                                 showsVerticalScrollIndicator={false}
+                                ListHeaderComponent={renderSelectedObjectivesHeader}
                                 ListFooterComponent={
                                     reordering ? (
                                         <View style={styles.reorderingBox}>
@@ -1736,6 +2285,14 @@ export default function CalendarScreen({ navigation }) {
                                     ) : null
                                 }
                             />
+                        ) : selectedObjectives.length > 0 ? (
+                            <ScrollView
+                                style={styles.dialogScroll}
+                                contentContainerStyle={styles.dialogScrollContent}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                {renderSelectedObjectivesHeader()}
+                            </ScrollView>
                         ) : (
                             <ScrollView
                                 style={styles.dialogScroll}
@@ -1756,13 +2313,14 @@ export default function CalendarScreen({ navigation }) {
                                     </Text>
 
                                     <Text style={styles.emptyDialogText}>
-                                        No hay tareas pendientes para {formatDateShort(selectedDate)}.
+                                        No hay tareas pendientes ni objetivos para {formatDateShort(selectedDate)}.
                                     </Text>
                                 </View>
                             </ScrollView>
                         )}
                     </Dialog.ScrollArea>
-                                        <Dialog.Actions style={styles.modalActionsRow}>
+
+                    <Dialog.Actions style={styles.modalActionsRow}>
                         <Button
                             mode="text"
                             compact
@@ -1784,6 +2342,19 @@ export default function CalendarScreen({ navigation }) {
                             icon="plus"
                         >
                             Nueva tarea
+                        </Button>
+
+                        <Button
+                            mode="contained"
+                            compact
+                            onPress={handleCreateWeeklyObjectiveForSelectedDate}
+                            buttonColor={palette.primary}
+                            textColor="#FFFFFF"
+                            style={styles.modalSmallButton}
+                            labelStyle={styles.modalSmallButtonLabel}
+                            icon="flag-plus-outline"
+                        >
+                            Objetivo
                         </Button>
                     </Dialog.Actions>
                 </Dialog>
@@ -1830,6 +2401,59 @@ export default function CalendarScreen({ navigation }) {
                                 onPress={handleConfirmDeleteTask}
                                 loading={!!deletingTaskId}
                                 disabled={!!deletingTaskId}
+                                style={styles.confirmDeleteButton}
+                                buttonColor={palette.danger}
+                                textColor="#FFFFFF"
+                                icon="trash-can-outline"
+                            >
+                                Eliminar
+                            </Button>
+                        </View>
+                    </Dialog.Content>
+                </Dialog>
+
+                <Dialog
+                    visible={deleteObjectiveDialogVisible}
+                    onDismiss={handleCloseDeleteObjectiveDialog}
+                    style={styles.deleteDialog}
+                >
+                    <Dialog.Content style={styles.deleteDialogContent}>
+                        <View style={styles.deleteIconCircle}>
+                            <MaterialCommunityIcons
+                                name="flag-remove-outline"
+                                size={28}
+                                color="#FFFFFF"
+                            />
+                        </View>
+
+                        <Text variant="titleLarge" style={styles.deleteDialogTitle}>
+                            Eliminar objetivo
+                        </Text>
+
+                        <Text variant="bodyMedium" style={styles.deleteDialogText}>
+                            ¿Querés eliminar{" "}
+                            <Text style={styles.deleteDialogStrong}>
+                                {objectiveToDelete?.title || "este objetivo semanal"}
+                            </Text>
+                            ? Esta acción no se puede deshacer.
+                        </Text>
+
+                        <View style={styles.deleteDialogActions}>
+                            <Button
+                                mode="outlined"
+                                onPress={handleCloseDeleteObjectiveDialog}
+                                disabled={!!deletingObjectiveId}
+                                style={styles.cancelDeleteButton}
+                                textColor={palette.textSecondary}
+                            >
+                                Cancelar
+                            </Button>
+
+                            <Button
+                                mode="contained"
+                                onPress={handleConfirmDeleteWeeklyObjective}
+                                loading={!!deletingObjectiveId}
+                                disabled={!!deletingObjectiveId}
                                 style={styles.confirmDeleteButton}
                                 buttonColor={palette.danger}
                                 textColor="#FFFFFF"
@@ -1894,7 +2518,7 @@ function createStyles(palette, isDarkMode) {
         subtitle: {
             color: palette.textSecondary,
             lineHeight: 21,
-            maxWidth: 340,
+            maxWidth: 360,
         },
 
         filtersCard: {
@@ -2124,16 +2748,101 @@ function createStyles(palette, isDarkMode) {
             color: palette.textSecondary,
         },
 
+        monthWeekRowWrapper: {
+            position: "relative",
+            overflow: "visible",
+        },
+
         monthWeekRow: {
             flexDirection: "row",
             alignItems: "stretch",
+        },
+
+        weeklyObjectivesLayer: {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 20,
+        },
+
+        weeklyObjectiveBar: {
+            position: "absolute",
+            height: 18,
+            borderRadius: 999,
+            borderWidth: 1,
+            paddingHorizontal: 5,
+            flexDirection: "row",
+            alignItems: "center",
+            overflow: "hidden",
+            zIndex: 40,
+            elevation: 3,
+        },
+
+        weeklyObjectiveBarPressed: {
+            opacity: 0.86,
+            transform: [{ scale: 0.995 }],
+        },
+
+        weeklyObjectiveInitialsRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginRight: 4,
+        },
+
+        weeklyObjectiveInitial: {
+            width: 14,
+            height: 14,
+            borderRadius: 999,
+            backgroundColor: "rgba(255,255,255,0.24)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.65)",
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        weeklyObjectiveInitialText: {
+            fontSize: 7.5,
+            fontWeight: "900",
+            lineHeight: 9,
+        },
+
+        weeklyObjectiveTitle: {
+            flex: 1,
+            fontSize: 9.5,
+            fontWeight: "900",
+            color: "#FFFFFF",
+            lineHeight: 11,
+        },
+
+        weeklyObjectiveHiddenBadge: {
+            position: "absolute",
+            top: 72,
+            right: 5,
+            minWidth: 25,
+            height: 16,
+            borderRadius: 999,
+            backgroundColor: isDarkMode
+                ? "rgba(255,255,255,0.12)"
+                : "rgba(15,23,42,0.12)",
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 6,
+            zIndex: 40,
+        },
+
+        weeklyObjectiveHiddenText: {
+            fontSize: 9,
+            fontWeight: "900",
+            color: palette.text,
         },
 
         monthDayCell: {
             borderWidth: 0.5,
             borderColor: palette.border,
             paddingHorizontal: 1,
-            paddingTop: 2,
+            paddingTop: 50,
             paddingBottom: 2,
             overflow: "hidden",
             backgroundColor: palette.card,
@@ -2160,6 +2869,11 @@ function createStyles(palette, isDarkMode) {
         },
 
         monthDayNumber: {
+            position: "absolute",
+            top: 4,
+            left: 0,
+            right: 0,
+            zIndex: 60,
             fontSize: 11,
             fontWeight: "900",
             color: palette.text,
@@ -2236,7 +2950,6 @@ function createStyles(palette, isDarkMode) {
         monthTaskInitialText: {
             fontSize: 7.5,
             fontWeight: "900",
-            color: "#FFFFFF",
             lineHeight: 9,
         },
 
@@ -2297,7 +3010,7 @@ function createStyles(palette, isDarkMode) {
             borderColor: palette.border,
             backgroundColor: palette.card,
             paddingHorizontal: 2,
-            paddingTop: 3,
+            paddingTop: 50,
             paddingBottom: 4,
             overflow: "visible",
         },
@@ -2387,7 +3100,6 @@ function createStyles(palette, isDarkMode) {
         weekTaskInitialText: {
             fontSize: 8.5,
             fontWeight: "900",
-            color: "#FFFFFF",
             lineHeight: 10,
         },
 
@@ -2401,6 +3113,73 @@ function createStyles(palette, isDarkMode) {
 
         weekEmptySpace: {
             minHeight: 70,
+        },
+
+        selectedObjectivesWrap: {
+            paddingHorizontal: 0,
+            paddingTop: 4,
+            paddingBottom: 4,
+        },
+
+        selectedObjectivesTitle: {
+            fontSize: 13,
+            fontWeight: "900",
+            color: palette.text,
+            marginBottom: 8,
+        },
+
+        objectiveModalCard: {
+            borderWidth: 1,
+            borderRadius: 18,
+            paddingHorizontal: 14,
+            paddingVertical: 13,
+            marginBottom: 12,
+        },
+
+        objectiveModalTop: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 10,
+        },
+
+        objectiveModalInitialsRow: {
+            minWidth: 44,
+            flexDirection: "row",
+            alignItems: "center",
+        },
+
+        objectiveModalInitial: {
+            width: 34,
+            height: 34,
+            borderRadius: 13,
+            alignItems: "center",
+            justifyContent: "center",
+            borderWidth: 1.5,
+            borderColor: palette.card,
+        },
+
+        objectiveModalInitialText: {
+            fontWeight: "900",
+            fontSize: 13,
+        },
+
+        objectiveModalTitleWrap: {
+            flex: 1,
+            minWidth: 0,
+        },
+
+        objectiveModalTitle: {
+            fontSize: 15,
+            fontWeight: "900",
+            lineHeight: 21,
+        },
+
+        objectiveModalSubtitle: {
+            marginTop: 2,
+            fontSize: 12.5,
+            color: palette.textSecondary,
+            fontWeight: "700",
         },
 
         categoryDialog: {
@@ -2419,7 +3198,7 @@ function createStyles(palette, isDarkMode) {
         },
 
         categoryDialogScroll: {
-            maxHeight: 420,
+            maxHeight: 390,
         },
 
         categoryDialogContent: {
@@ -2503,12 +3282,12 @@ function createStyles(palette, isDarkMode) {
         },
 
         dragList: {
-            maxHeight: 450,
+            maxHeight: 390,
         },
 
         dialogScrollContent: {
             paddingHorizontal: 20,
-            paddingBottom: -5,
+            paddingBottom: 12,
         },
 
         taskItem: {
@@ -2559,7 +3338,6 @@ function createStyles(palette, isDarkMode) {
         },
 
         taskAvatarText: {
-            color: "#FFFFFF",
             fontWeight: "900",
             fontSize: 13,
         },
@@ -2751,6 +3529,7 @@ function createStyles(palette, isDarkMode) {
             paddingHorizontal: 15,
             paddingTop: 0,
             paddingBottom: 10,
+            gap: 6,
         },
 
         modalSmallButton: {
@@ -2758,7 +3537,7 @@ function createStyles(palette, isDarkMode) {
         },
 
         modalSmallButtonLabel: {
-            fontSize: 12.5,
+            fontSize: 12,
             fontWeight: "800",
         },
 

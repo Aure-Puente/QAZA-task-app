@@ -28,7 +28,7 @@ export async function createWeeklyObjective({
     assignedTo,
     assignedToName,
     assignedUsers = [],
-    }) {
+}) {
     const docRef = await addDoc(collection(db, WEEKLY_OBJECTIVES_COLLECTION), {
         title: title.trim(),
         categoryKey,
@@ -44,7 +44,6 @@ export async function createWeeklyObjective({
 
         assignedTo,
         assignedToName,
-
         assignedUsers,
 
         completed: false,
@@ -53,9 +52,9 @@ export async function createWeeklyObjective({
     });
 
     return docRef.id;
-    }
+}
 
-    export async function getAllWeeklyObjectives() {
+export async function getAllWeeklyObjectives() {
     const q = query(
         collection(db, WEEKLY_OBJECTIVES_COLLECTION),
         orderBy("startDateTimestamp", "asc")
@@ -67,9 +66,9 @@ export async function createWeeklyObjective({
         id: item.id,
         ...item.data(),
     }));
-    }
+}
 
-    export async function updateWeeklyObjective(objectiveId, data) {
+export async function updateWeeklyObjective(objectiveId, data) {
     if (!objectiveId) return;
 
     const objectiveRef = doc(db, WEEKLY_OBJECTIVES_COLLECTION, objectiveId);
@@ -78,9 +77,9 @@ export async function createWeeklyObjective({
         ...data,
         updatedAt: serverTimestamp(),
     });
-    }
+}
 
-    export async function toggleWeeklyObjectiveCompleted(objectiveId, completed) {
+export async function toggleWeeklyObjectiveCompleted(objectiveId, completed) {
     if (!objectiveId) return;
 
     const objectiveRef = doc(db, WEEKLY_OBJECTIVES_COLLECTION, objectiveId);
@@ -89,9 +88,9 @@ export async function createWeeklyObjective({
         completed: !!completed,
         updatedAt: serverTimestamp(),
     });
-    }
+}
 
-    export async function deleteWeeklyObjective(objectiveId) {
+export async function deleteWeeklyObjective(objectiveId) {
     if (!objectiveId) return;
 
     const objectiveRef = doc(db, WEEKLY_OBJECTIVES_COLLECTION, objectiveId);
