@@ -49,7 +49,7 @@ export const NOTE_CATEGORIES = [
         onColor: "#FFFFFF",
         darkOnColor: "#431407",
 
-        icon: "package-variant-closed",
+        icon: "home-city-outline",
     },
     {
         key: "produccion_estudiarq",
@@ -66,7 +66,7 @@ export const NOTE_CATEGORIES = [
         onColor: "#FFFFFF",
         darkOnColor: "#422006",
 
-        icon: "home-city-outline",
+        icon: "book-open-page-variant-outline",
     },
 ];
 

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "QAZA",
-    "slug": "qaza",
+    "slug": "qaza-workspace",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/logo.jpeg",

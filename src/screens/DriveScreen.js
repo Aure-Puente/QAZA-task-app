@@ -63,18 +63,34 @@ const DRIVE_FOLDERS = [
         url: "https://drive.google.com/drive/folders/1O9PplReeUQIGwi0yoeRQt6kqUN2ztfSo",
     },
     {
+        id: "produccion_estudiarq",
+        title: "Producción EstudiARQ",
+        description: "Accedé a materiales, recursos y archivos de producción de EstudiARQ.",
+        icon: "book-open-page-variant-outline",
+
+        color: "#CA8A04",
+        soft: "rgba(202, 138, 4, 0.12)",
+        border: "rgba(202, 138, 4, 0.25)",
+
+        darkColor: "#FDE68A",
+        darkSoft: "rgba(253, 230, 138, 0.15)",
+        darkBorder: "rgba(253, 230, 138, 0.34)",
+
+        url: "https://drive.google.com/drive/folders/1O9PplReeUQIGwi0yoeRQt6kqUN2ztfSo",
+    },
+    {
         id: "biblioteca",
         title: "Biblioteca",
         description: "Consultá recursos, referencias y material de consulta del equipo.",
         icon: "bookshelf",
 
-        color: "#B7791F",
-        soft: "rgba(183, 121, 31, 0.12)",
-        border: "rgba(183, 121, 31, 0.24)",
+        color: "#3B6478",
+        soft: "rgba(59, 100, 120, 0.11)",
+        border: "rgba(59, 100, 120, 0.24)",
 
-        darkColor: "#FDE68A",
-        darkSoft: "rgba(253, 230, 138, 0.15)",
-        darkBorder: "rgba(253, 230, 138, 0.34)",
+        darkColor: "#9CCFE3",
+        darkSoft: "rgba(156, 207, 227, 0.14)",
+        darkBorder: "rgba(156, 207, 227, 0.34)",
 
         url: "https://drive.google.com/drive/folders/17U_9Lu0OrxKKtZQzPx3GgmuOIq2IbYgb",
     },
