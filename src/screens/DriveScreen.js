@@ -48,9 +48,9 @@ const DRIVE_FOLDERS = [
     },
     {
         id: "produccion",
-        title: "Producción",
+        title: "Producción QAZA",
         description: "Accedé a archivos, recursos y materiales de producción.",
-        icon: "package-variant-closed",
+        icon: "home-city-outline",
 
         color: "#D16B18",
         soft: "rgba(209, 107, 24, 0.11)",

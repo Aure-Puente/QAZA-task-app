@@ -449,31 +449,137 @@ function CalendarTaskPreview({
     );
 }
 
+function CalendarObjectivePreview({
+    objective,
+    variant = "month",
+    isPastDay = false,
+    styles,
+    palette,
+    isDarkMode,
+    onPress,
+}) {
+    const category = getNoteCategoryByKey(objective.categoryKey, isDarkMode);
+    const names = getObjectiveResponsibleNames(objective);
+    const visibleNames = names.slice(0, variant === "week" ? 4 : 3);
+    const extraNames = Math.max(names.length - visibleNames.length, 0);
+
+    return (
+        <Pressable
+            onPress={() => onPress(objective)}
+            style={({ pressed }) => [
+                variant === "week"
+                    ? styles.weekObjectiveCard
+                    : styles.monthObjectiveCard,
+                {
+                    backgroundColor: isPastDay ? "#64748B" : category.color,
+                    borderColor: isPastDay ? "#64748B" : category.color,
+                },
+                pressed && styles.objectivePreviewPressed,
+            ]}
+        >
+            <View style={styles.objectivePreviewInitialsRow}>
+                {visibleNames.map((name, index) => (
+                    <View
+                        key={`${objective.id}-${name}-${index}`}
+                        style={[
+                            variant === "week"
+                                ? styles.weekObjectiveInitial
+                                : styles.monthObjectiveInitial,
+                            { marginLeft: index === 0 ? 0 : -5 },
+                        ]}
+                    >
+                        <Text
+                            style={[
+                                variant === "week"
+                                    ? styles.weekObjectiveInitialText
+                                    : styles.monthObjectiveInitialText,
+                                { color: category.textOnColor },
+                            ]}
+                        >
+                            {getInitials(name)}
+                        </Text>
+                    </View>
+                ))}
+
+                {extraNames > 0 ? (
+                    <View
+                        style={[
+                            variant === "week"
+                                ? styles.weekObjectiveInitial
+                                : styles.monthObjectiveInitial,
+                            { marginLeft: -5 },
+                        ]}
+                    >
+                        <Text
+                            style={[
+                                variant === "week"
+                                    ? styles.weekObjectiveInitialText
+                                    : styles.monthObjectiveInitialText,
+                                { color: category.textOnColor },
+                            ]}
+                        >
+                            +{extraNames}
+                        </Text>
+                    </View>
+                ) : null}
+            </View>
+
+            <Text
+                style={
+                    variant === "week"
+                        ? styles.weekObjectiveTitle
+                        : styles.monthObjectiveTitle
+                }
+                numberOfLines={variant === "week" ? 2 : 1}
+                ellipsizeMode="tail"
+            >
+                {objective.title || "Objetivo"}
+            </Text>
+        </Pressable>
+    );
+}
+
 function MonthDayCell({
     date,
     currentMonthDate,
     selectedDate,
     todayKey,
     tasksByDate,
+    objectiveRowsByDate,
+    hiddenObjectivesByDate,
     onPressDay,
     dayCellWidth,
     dayCellHeight,
     styles,
     palette,
     isDarkMode,
-    maxVisibleTasks = 3,
+    maxVisibleItems = 4,
     taskVariant = "month",
 }) {
     const dateKey = toDateKey(date);
     const dayTasks = tasksByDate[dateKey] || [];
-    const visibleTasks = dayTasks.slice(0, maxVisibleTasks);
-    const hiddenCount = Math.max(dayTasks.length - maxVisibleTasks, 0);
+    const objectiveRowsCount = objectiveRowsByDate?.[dateKey] || 0;
+    const hiddenObjectivesCount = hiddenObjectivesByDate?.[dateKey] || 0;
+
+    const availableTaskSlots =
+        maxVisibleItems >= 999
+            ? 999
+            : Math.max(maxVisibleItems - objectiveRowsCount, 0);
+
+    const visibleTasks = dayTasks.slice(0, availableTaskSlots);
+    const hiddenTasksCount =
+        maxVisibleItems >= 999
+            ? 0
+            : Math.max(dayTasks.length - visibleTasks.length, 0);
+    const hiddenCount = hiddenObjectivesCount + hiddenTasksCount;
 
     const isSelected = selectedDate === dateKey;
     const isToday = todayKey === dateKey;
     const isPastDay = isDateBeforeToday(dateKey, todayKey);
     const isCurrentMonth = date.getMonth() === currentMonthDate.getMonth();
     const hasPinnedTask = dayTasks.some((task) => !!task?.isPinned);
+    const tasksOffsetTop =
+        objectiveRowsCount > 0 ? objectiveRowsCount * 22 + 4 : 0;
 
     return (
         <Pressable
@@ -507,7 +613,7 @@ function MonthDayCell({
                 {date.getDate()}
             </Text>
 
-            <View style={styles.monthTasksWrap}>
+            <View style={[styles.monthTasksWrap, { marginTop: tasksOffsetTop }]}>
                 {visibleTasks.map((task) => (
                     <CalendarTaskPreview
                         key={task.id}
@@ -658,9 +764,31 @@ function doesObjectiveIncludeDate(objective, dateKey) {
     return String(objective.startDateKey) <= String(dateKey) && String(dateKey) <= String(objective.endDateKey);
 }
 
+function getDateKeysBetween(startDateKey, endDateKey) {
+    if (!startDateKey || !endDateKey) return [];
+
+    const start = getDateFromKey(startDateKey);
+    const end = getDateFromKey(endDateKey);
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+
+    const keys = [];
+    const cursor = new Date(start);
+
+    while (cursor <= end) {
+        keys.push(toDateKey(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return keys;
+}
+
 function getObjectiveSegmentsForWeek({ objectives, week, cellWidth, maxVisible = 2 }) {
     if (!Array.isArray(objectives) || !Array.isArray(week) || week.length === 0) {
-        return { segments: [], hiddenCount: 0 };
+        return { segments: [], hiddenCount: 0, weekObjectives: [] };
     }
 
     const weekStartKey = toDateKey(week[0]);
@@ -672,7 +800,10 @@ function getObjectiveSegmentsForWeek({ objectives, week, cellWidth, maxVisible =
             return objective.startDateKey <= weekEndKey && objective.endDateKey >= weekStartKey;
         })
         .sort((a, b) => {
-            if (a.startDateKey !== b.startDateKey) return a.startDateKey.localeCompare(b.startDateKey);
+            if (a.startDateKey !== b.startDateKey) {
+                return a.startDateKey.localeCompare(b.startDateKey);
+            }
+
             return a.endDateKey.localeCompare(b.endDateKey);
         });
 
@@ -685,7 +816,10 @@ function getObjectiveSegmentsForWeek({ objectives, week, cellWidth, maxVisible =
         week.forEach((day, dayIndex) => {
             const dayKey = toDateKey(day);
 
-            if (dayKey === objective.startDateKey || (dayKey > objective.startDateKey && dayIndex === 0)) {
+            if (
+                dayKey === objective.startDateKey ||
+                (dayKey > objective.startDateKey && dayIndex === 0)
+            ) {
                 startIndex = Math.max(startIndex, dayIndex);
             }
 
@@ -702,12 +836,14 @@ function getObjectiveSegmentsForWeek({ objectives, week, cellWidth, maxVisible =
             left,
             width,
             top: 28 + index * 22,
+            rowIndex: index,
         };
     });
 
     return {
         segments,
         hiddenCount: Math.max(weekObjectives.length - visibleObjectives.length, 0),
+        weekObjectives,
     };
 }
 
@@ -777,28 +913,45 @@ function WeeklyObjectiveBar({ objective, left, width, top, styles, onPress , isD
     );
 }
 
-    function MonthWeekRowWithObjectives({
-        week,
-        currentMonthDate,
-        selectedDate,
-        todayKey,
-        tasksByDate,
-        objectives,
-        onPressDay,
-        onPressObjective,
-        dayCellWidth,
-        dayCellHeight,
-        styles,
-        palette,
-        isDarkMode,
-        maxVisibleTasks = 3,
-        taskVariant = "month",
-    }) {
-    const { segments, hiddenCount } = getObjectiveSegmentsForWeek({
+function MonthWeekRowWithObjectives({
+    week,
+    currentMonthDate,
+    selectedDate,
+    todayKey,
+    tasksByDate,
+    objectives,
+    onPressDay,
+    onPressObjective,
+    dayCellWidth,
+    dayCellHeight,
+    styles,
+    palette,
+    isDarkMode,
+    maxVisibleItems = 4,
+    taskVariant = "month",
+}) {
+    const maxVisibleObjectives = taskVariant === "week" ? 999 : maxVisibleItems;
+    const { segments, weekObjectives } = getObjectiveSegmentsForWeek({
         objectives,
         week,
         cellWidth: dayCellWidth,
-        maxVisible: 2,
+        maxVisible: maxVisibleObjectives,
+    });
+
+    const objectiveRowsByDate = {};
+    const hiddenObjectivesByDate = {};
+
+    week.forEach((date) => {
+        const dateKey = toDateKey(date);
+        const visibleCount = segments.filter((segment) =>
+            doesObjectiveIncludeDate(segment.objective, dateKey)
+        ).length;
+        const totalCount = weekObjectives.filter((objective) =>
+            doesObjectiveIncludeDate(objective, dateKey)
+        ).length;
+
+        objectiveRowsByDate[dateKey] = visibleCount;
+        hiddenObjectivesByDate[dateKey] = Math.max(totalCount - visibleCount, 0);
     });
 
     return (
@@ -812,13 +965,15 @@ function WeeklyObjectiveBar({ objective, left, width, top, styles, onPress , isD
                         selectedDate={selectedDate}
                         todayKey={todayKey}
                         tasksByDate={tasksByDate}
+                        objectiveRowsByDate={objectiveRowsByDate}
+                        hiddenObjectivesByDate={hiddenObjectivesByDate}
                         onPressDay={onPressDay}
                         dayCellWidth={dayCellWidth}
                         dayCellHeight={dayCellHeight}
                         styles={styles}
                         palette={palette}
                         isDarkMode={isDarkMode}
-                        maxVisibleTasks={maxVisibleTasks}
+                        maxVisibleItems={maxVisibleItems}
                         taskVariant={taskVariant}
                     />
                 ))}
@@ -837,12 +992,6 @@ function WeeklyObjectiveBar({ objective, left, width, top, styles, onPress , isD
                         isDarkMode={isDarkMode}
                     />
                 ))}
-
-                {hiddenCount > 0 ? (
-                    <View style={styles.weeklyObjectiveHiddenBadge}>
-                        <Text style={styles.weeklyObjectiveHiddenText}>+{hiddenCount}</Text>
-                    </View>
-                ) : null}
             </View>
         </View>
     );
@@ -1027,8 +1176,9 @@ export default function CalendarScreen({ navigation }) {
     const [objectiveToDelete, setObjectiveToDelete] = useState(null);
 
     const [ownerFilter, setOwnerFilter] = useState(null);
+    const [contentTypeFilter, setContentTypeFilter] = useState(null);
     const [categoryFilter, setCategoryFilter] = useState(null);
-    const [categoryDialogVisible, setCategoryDialogVisible] = useState(false);
+    const [filtersExpanded, setFiltersExpanded] = useState(false);
 
     useEffect(() => {
         async function loadSavedCalendarViewMode() {
@@ -1119,6 +1269,8 @@ export default function CalendarScreen({ navigation }) {
 
     const filteredTasks = useMemo(() => {
         return datedTasks.filter((task) => {
+            if (contentTypeFilter === "objectives") return false;
+
             if (ownerFilter === "mine") {
                 if (!isTaskAssignedToUser(task, user?.uid)) return false;
             }
@@ -1133,7 +1285,7 @@ export default function CalendarScreen({ navigation }) {
 
             return true;
         });
-    }, [datedTasks, ownerFilter, categoryFilter, user?.uid]);
+    }, [datedTasks, ownerFilter, contentTypeFilter, categoryFilter, user?.uid]);
 
     const normalizedObjectives = useMemo(() => {
         return (weeklyObjectives || [])
@@ -1152,6 +1304,8 @@ export default function CalendarScreen({ navigation }) {
 
     const filteredObjectives = useMemo(() => {
         return normalizedObjectives.filter((objective) => {
+            if (contentTypeFilter === "tasks") return false;
+
             if (ownerFilter === "mine") {
                 if (!isObjectiveAssignedToUser(objective, user?.uid)) return false;
             }
@@ -1166,7 +1320,7 @@ export default function CalendarScreen({ navigation }) {
 
             return true;
         });
-    }, [normalizedObjectives, ownerFilter, categoryFilter, user?.uid]);
+    }, [normalizedObjectives, ownerFilter, contentTypeFilter, categoryFilter, user?.uid]);
 
     const tasksByDate = useMemo(() => {
         return filteredTasks.reduce((acc, task) => {
@@ -1179,6 +1333,32 @@ export default function CalendarScreen({ navigation }) {
             return acc;
         }, {});
     }, [filteredTasks]);
+
+    const objectivesByDate = useMemo(() => {
+        return filteredObjectives.reduce((acc, objective) => {
+            const dateKeys = getDateKeysBetween(
+                objective.startDateKey,
+                objective.endDateKey
+            );
+
+            dateKeys.forEach((dateKey) => {
+                if (!acc[dateKey]) {
+                    acc[dateKey] = [];
+                }
+
+                acc[dateKey].push(objective);
+                acc[dateKey].sort((a, b) => {
+                    if (a.startDateKey !== b.startDateKey) {
+                        return a.startDateKey.localeCompare(b.startDateKey);
+                    }
+
+                    return a.endDateKey.localeCompare(b.endDateKey);
+                });
+            });
+
+            return acc;
+        }, {});
+    }, [filteredObjectives]);
 
     const selectedTasks = useMemo(() => {
         return tasksByDate[selectedDate] || [];
@@ -1204,7 +1384,7 @@ export default function CalendarScreen({ navigation }) {
         return getWeekDays(currentWeekDate);
     }, [currentWeekDate]);
 
-    const hasActiveFilters = !!ownerFilter || !!categoryFilter;
+    const hasActiveFilters = !!ownerFilter || !!contentTypeFilter || !!categoryFilter;
     const canReorderSelectedDay = selectedTasks.length > 1;
 
     const handleDayPress = (dateKey) => {
@@ -1242,13 +1422,17 @@ export default function CalendarScreen({ navigation }) {
         setOwnerFilter((prev) => (prev === value ? null : value));
     };
 
+    const handleToggleContentTypeFilter = (value) => {
+        setContentTypeFilter((prev) => (prev === value ? null : value));
+    };
+
     const handleSelectCategoryFilter = (categoryKey) => {
         setCategoryFilter((prev) => (prev === categoryKey ? null : categoryKey));
-        setCategoryDialogVisible(false);
     };
 
     const handleClearFilters = () => {
         setOwnerFilter(null);
+        setContentTypeFilter(null);
         setCategoryFilter(null);
     };
 
@@ -1811,7 +1995,14 @@ export default function CalendarScreen({ navigation }) {
 
                     <Card style={styles.filtersCard}>
                         <Card.Content style={styles.filtersContent}>
-                            <View style={styles.filtersTopRow}>
+                            <Pressable
+                                onPress={() => setFiltersExpanded((prev) => !prev)}
+                                style={({ pressed }) => [
+                                    styles.filtersTopRow,
+                                    pressed && styles.filtersTopRowPressed,
+                                    !filtersExpanded && styles.filtersTopRowClosed,
+                                ]}
+                            >
                                 <View style={styles.filtersTitleRow}>
                                     <View style={styles.filtersIconWrap}>
                                         <MaterialCommunityIcons
@@ -1821,127 +2012,222 @@ export default function CalendarScreen({ navigation }) {
                                         />
                                     </View>
 
-                                    <Text style={styles.filtersTitle}>Filtros</Text>
+                                    <View style={styles.filtersTitleTextWrap}>
+                                        <Text style={styles.filtersTitle}>Filtros</Text>
+
+                                        <Text style={styles.filtersSubtitle}>
+                                            {hasActiveFilters
+                                                ? "Hay filtros activos"
+                                                : "Tocá para mostrar u ocultar"}
+                                        </Text>
+                                    </View>
                                 </View>
 
-                                <Pressable
-                                    onPress={handleClearFilters}
-                                    disabled={!hasActiveFilters}
-                                    hitSlop={8}
-                                    style={styles.clearFiltersPressable}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.clearFiltersText,
-                                            !hasActiveFilters && styles.clearFiltersTextHidden,
-                                        ]}
-                                    >
-                                        Limpiar
-                                    </Text>
-                                </Pressable>
-                            </View>
+                                <View style={styles.filtersHeaderActions}>
+                                    {hasActiveFilters ? (
+                                        <Pressable
+                                            onPress={(event) => {
+                                                event.stopPropagation?.();
+                                                handleClearFilters();
+                                            }}
+                                            hitSlop={8}
+                                            style={styles.clearFiltersPressable}
+                                        >
+                                            <Text style={styles.clearFiltersText}>Limpiar</Text>
+                                        </Pressable>
+                                    ) : null}
 
-                            <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={styles.filtersScrollContent}
-                            >
-                                <Chip
-                                    compact
-                                    selected={ownerFilter === "mine"}
-                                    onPress={() => handleToggleOwnerFilter("mine")}
-                                    showSelectedCheck={false}
-                                    style={[
-                                        styles.filterChip,
-                                        ownerFilter === "mine" && styles.filterChipSelected,
-                                    ]}
-                                    textStyle={[
-                                        styles.filterChipText,
-                                        ownerFilter === "mine" && {
-                                            color: palette.primary,
-                                            fontWeight: "800",
-                                        },
-                                    ]}
-                                    icon={() => (
-                                        <MaterialCommunityIcons
-                                            name="account-check-outline"
-                                            size={14}
-                                            color={
-                                                ownerFilter === "mine"
-                                                    ? palette.primary
-                                                    : palette.textMuted
-                                            }
-                                        />
-                                    )}
-                                >
-                                    Mías
-                                </Chip>
+                                    <MaterialCommunityIcons
+                                        name={filtersExpanded ? "chevron-up" : "chevron-down"}
+                                        size={22}
+                                        color={palette.textMuted}
+                                    />
+                                </View>
+                            </Pressable>
 
-                                <Chip
-                                    compact
-                                    selected={ownerFilter === "others"}
-                                    onPress={() => handleToggleOwnerFilter("others")}
-                                    showSelectedCheck={false}
-                                    style={[
-                                        styles.filterChip,
-                                        ownerFilter === "others" && styles.filterChipSelected,
-                                    ]}
-                                    textStyle={[
-                                        styles.filterChipText,
-                                        ownerFilter === "others" && {
-                                            color: palette.primary,
-                                            fontWeight: "800",
-                                        },
-                                    ]}
-                                    icon={() => (
-                                        <MaterialCommunityIcons
-                                            name="account-group-outline"
-                                            size={14}
-                                            color={
-                                                ownerFilter === "others"
-                                                    ? palette.primary
-                                                    : palette.textMuted
-                                            }
-                                        />
-                                    )}
-                                >
-                                    Otros
-                                </Chip>
+                            {filtersExpanded ? (
+                                <View style={styles.filtersAccordionContent}>
+                                    <View style={styles.filterGroup}>
+                                        <Text style={styles.filterGroupTitle}>Responsable</Text>
 
-                                <Chip
-                                    compact
-                                    selected={!!categoryFilter}
-                                    onPress={() => setCategoryDialogVisible(true)}
-                                    showSelectedCheck={false}
-                                    style={[
-                                        styles.filterChip,
-                                        categoryFilter && {
-                                            backgroundColor: selectedCategory?.soft,
-                                            borderColor: selectedCategory?.border,
-                                        },
-                                    ]}
-                                    textStyle={[
-                                        styles.filterChipText,
-                                        categoryFilter && {
-                                            color: selectedCategory?.color,
-                                            fontWeight: "800",
-                                        },
-                                    ]}
-                                    icon={() => (
-                                        <MaterialCommunityIcons
-                                            name={selectedCategory?.icon || "shape-outline"}
-                                            size={14}
-                                            color={
-                                                categoryFilter
-                                                    ? selectedCategory?.color
-                                                    : palette.textMuted
-                                            }
-                                        />
-                                    )}
-                                >
-                                    {selectedCategory?.label || "Categoría"}
-                                </Chip>
-                            </ScrollView>
+                                        <View style={styles.filterChipsWrap}>
+                                            <Chip
+                                                compact
+                                                selected={ownerFilter === "mine"}
+                                                onPress={() => handleToggleOwnerFilter("mine")}
+                                                showSelectedCheck={false}
+                                                style={[
+                                                    styles.filterChip,
+                                                    ownerFilter === "mine" && styles.filterChipSelected,
+                                                ]}
+                                                textStyle={[
+                                                    styles.filterChipText,
+                                                    ownerFilter === "mine" && {
+                                                        color: palette.primary,
+                                                        fontWeight: "800",
+                                                    },
+                                                ]}
+                                                icon={() => (
+                                                    <MaterialCommunityIcons
+                                                        name="account-check-outline"
+                                                        size={14}
+                                                        color={
+                                                            ownerFilter === "mine"
+                                                                ? palette.primary
+                                                                : palette.textMuted
+                                                        }
+                                                    />
+                                                )}
+                                            >
+                                                Mías
+                                            </Chip>
+
+                                            <Chip
+                                                compact
+                                                selected={ownerFilter === "others"}
+                                                onPress={() => handleToggleOwnerFilter("others")}
+                                                showSelectedCheck={false}
+                                                style={[
+                                                    styles.filterChip,
+                                                    ownerFilter === "others" && styles.filterChipSelected,
+                                                ]}
+                                                textStyle={[
+                                                    styles.filterChipText,
+                                                    ownerFilter === "others" && {
+                                                        color: palette.primary,
+                                                        fontWeight: "800",
+                                                    },
+                                                ]}
+                                                icon={() => (
+                                                    <MaterialCommunityIcons
+                                                        name="account-group-outline"
+                                                        size={14}
+                                                        color={
+                                                            ownerFilter === "others"
+                                                                ? palette.primary
+                                                                : palette.textMuted
+                                                        }
+                                                    />
+                                                )}
+                                            >
+                                                Otros
+                                            </Chip>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.filterGroup}>
+                                        <Text style={styles.filterGroupTitle}>Tipo</Text>
+
+                                        <View style={styles.filterChipsWrap}>
+                                            <Chip
+                                                compact
+                                                selected={contentTypeFilter === "tasks"}
+                                                onPress={() => handleToggleContentTypeFilter("tasks")}
+                                                showSelectedCheck={false}
+                                                style={[
+                                                    styles.filterChip,
+                                                    contentTypeFilter === "tasks" && styles.filterChipSelected,
+                                                ]}
+                                                textStyle={[
+                                                    styles.filterChipText,
+                                                    contentTypeFilter === "tasks" && {
+                                                        color: palette.primary,
+                                                        fontWeight: "800",
+                                                    },
+                                                ]}
+                                                icon={() => (
+                                                    <MaterialCommunityIcons
+                                                        name="checkbox-marked-circle-outline"
+                                                        size={14}
+                                                        color={
+                                                            contentTypeFilter === "tasks"
+                                                                ? palette.primary
+                                                                : palette.textMuted
+                                                        }
+                                                    />
+                                                )}
+                                            >
+                                                Tareas
+                                            </Chip>
+
+                                            <Chip
+                                                compact
+                                                selected={contentTypeFilter === "objectives"}
+                                                onPress={() => handleToggleContentTypeFilter("objectives")}
+                                                showSelectedCheck={false}
+                                                style={[
+                                                    styles.filterChip,
+                                                    contentTypeFilter === "objectives" && styles.filterChipSelected,
+                                                ]}
+                                                textStyle={[
+                                                    styles.filterChipText,
+                                                    contentTypeFilter === "objectives" && {
+                                                        color: palette.primary,
+                                                        fontWeight: "800",
+                                                    },
+                                                ]}
+                                                icon={() => (
+                                                    <MaterialCommunityIcons
+                                                        name="flag-outline"
+                                                        size={14}
+                                                        color={
+                                                            contentTypeFilter === "objectives"
+                                                                ? palette.primary
+                                                                : palette.textMuted
+                                                        }
+                                                    />
+                                                )}
+                                            >
+                                                Objetivos semanales
+                                            </Chip>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.filterGroup}>
+                                        <Text style={styles.filterGroupTitle}>Categorías</Text>
+
+                                        <View style={styles.filterChipsWrap}>
+                                            {NOTE_CATEGORIES.map((item) => {
+                                                const category = getNoteCategoryByKey(item.key, isDarkMode);
+                                                const selected = item.key === categoryFilter;
+
+                                                return (
+                                                    <Chip
+                                                        key={category.key}
+                                                        compact
+                                                        selected={selected}
+                                                        onPress={() => handleSelectCategoryFilter(category.key)}
+                                                        showSelectedCheck={false}
+                                                        style={[
+                                                            styles.filterChip,
+                                                            selected && {
+                                                                backgroundColor: category.soft,
+                                                                borderColor: category.border,
+                                                            },
+                                                        ]}
+                                                        textStyle={[
+                                                            styles.filterChipText,
+                                                            selected && {
+                                                                color: category.color,
+                                                                fontWeight: "800",
+                                                            },
+                                                        ]}
+                                                        icon={() => (
+                                                            <MaterialCommunityIcons
+                                                                name={category.icon}
+                                                                size={14}
+                                                                color={selected ? category.color : palette.textMuted}
+                                                            />
+                                                        )}
+                                                    >
+                                                        {category.label}
+                                                    </Chip>
+                                                );
+                                            })}
+                                        </View>
+                                    </View>
+                                </View>
+                            ) : null}
                         </Card.Content>
                     </Card>
 
@@ -2091,6 +2377,7 @@ export default function CalendarScreen({ navigation }) {
                                             styles={styles}
                                             palette={palette}
                                             isDarkMode={false}
+                                            maxVisibleItems={4}
                                         />
                                     ))}
                                 </View>
@@ -2130,7 +2417,8 @@ export default function CalendarScreen({ navigation }) {
                                             dayCellHeight={420}
                                             styles={styles}
                                             palette={palette}
-                                            maxVisibleTasks={999}
+                                            isDarkMode={false}
+                                            maxVisibleItems={999}
                                             taskVariant="week"
                                         />
                                     </View>
@@ -2142,101 +2430,6 @@ export default function CalendarScreen({ navigation }) {
             </View>
 
             <Portal>
-                <Dialog
-                    visible={categoryDialogVisible}
-                    onDismiss={() => setCategoryDialogVisible(false)}
-                    style={styles.categoryDialog}
-                >
-                    <Dialog.Title style={styles.categoryDialogTitle}>
-                        Filtrar por categoría
-                    </Dialog.Title>
-
-                    <Dialog.ScrollArea style={styles.categoryDialogScrollArea}>
-                        <ScrollView
-                            style={styles.categoryDialogScroll}
-                            contentContainerStyle={styles.categoryDialogContent}
-                            showsVerticalScrollIndicator={false}
-                        >
-                            {NOTE_CATEGORIES.map((item) => {
-                                const category = getNoteCategoryByKey(item.key, isDarkMode);
-                                const selected = item.key === categoryFilter;
-
-                                return (
-                                    <Pressable
-                                        key={category.key}
-                                        onPress={() => handleSelectCategoryFilter(category.key)}
-                                        style={({ pressed }) => [
-                                            styles.categoryOption,
-                                            {
-                                                backgroundColor: selected
-                                                    ? category.soft
-                                                    : isDarkMode
-                                                    ? "rgba(255,255,255,0.025)"
-                                                    : "#FFFFFF",
-                                                borderColor: selected ? category.border : palette.border,
-                                            },
-                                            pressed && styles.categoryOptionPressed,
-                                        ]}
-                                    >
-                                        <View
-                                            style={[
-                                                styles.categoryOptionIcon,
-                                                {
-                                                    backgroundColor: category.soft,
-                                                    borderColor: category.border,
-                                                },
-                                            ]}
-                                        >
-                                            <MaterialCommunityIcons
-                                                name={category.icon}
-                                                size={18}
-                                                color={category.color}
-                                            />
-                                        </View>
-
-                                        <Text
-                                            style={[
-                                                styles.categoryOptionText,
-                                                selected && { color: category.color },
-                                            ]}
-                                        >
-                                            {category.label}
-                                        </Text>
-
-                                        {selected ? (
-                                            <MaterialCommunityIcons
-                                                name="check-circle"
-                                                size={20}
-                                                color={category.color}
-                                            />
-                                        ) : null}
-                                    </Pressable>
-                                );
-                            })}
-                        </ScrollView>
-                    </Dialog.ScrollArea>
-                                        <Dialog.Actions>
-                        {categoryFilter ? (
-                            <Button
-                                onPress={() => {
-                                    setCategoryFilter(null);
-                                    setCategoryDialogVisible(false);
-                                }}
-                                textColor={palette.textSecondary}
-                            >
-                                Quitar filtro
-                            </Button>
-                        ) : null}
-
-                        <Button
-                            onPress={() => setCategoryDialogVisible(false)}
-                            textColor={palette.primary}
-                        >
-                            Cerrar
-                        </Button>
-                    </Dialog.Actions>
-                </Dialog>
-
                 <Dialog
                     visible={dialogVisible}
                     onDismiss={() => setDialogVisible(false)}
@@ -2542,25 +2735,32 @@ function createStyles(palette, isDarkMode) {
         },
 
         filtersTopRow: {
-            height: 28,
+            minHeight: 42,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: 9,
             overflow: "hidden",
+        },
+
+        filtersTopRowClosed: {
+            minHeight: 40,
+        },
+
+        filtersTopRowPressed: {
+            opacity: 0.88,
         },
 
         filtersTitleRow: {
             flexDirection: "row",
             alignItems: "center",
-            gap: 7,
+            gap: 9,
             flex: 1,
         },
 
         filtersIconWrap: {
-            width: 27,
-            height: 27,
-            borderRadius: 10,
+            width: 30,
+            height: 30,
+            borderRadius: 11,
             backgroundColor: isDarkMode
                 ? "rgba(240, 138, 43, 0.11)"
                 : "rgba(209, 107, 24, 0.08)",
@@ -2572,18 +2772,38 @@ function createStyles(palette, isDarkMode) {
             justifyContent: "center",
         },
 
+        filtersTitleTextWrap: {
+            flex: 1,
+        },
+
         filtersTitle: {
             fontSize: 13.5,
             fontWeight: "800",
             color: palette.text,
         },
 
+        filtersSubtitle: {
+            marginTop: 1,
+            fontSize: 11.2,
+            fontWeight: "700",
+            color: palette.textSecondary,
+        },
+
+        filtersHeaderActions: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+        },
+
         clearFiltersPressable: {
-            width: 64,
+            minWidth: 58,
             height: 28,
-            alignItems: "flex-end",
+            alignItems: "center",
             justifyContent: "center",
-            overflow: "hidden",
+            borderRadius: 12,
+            backgroundColor: isDarkMode ? "rgba(255,255,255,0.035)" : "#F8FAFC",
+            borderWidth: 1,
+            borderColor: palette.border,
         },
 
         clearFiltersText: {
@@ -2592,8 +2812,25 @@ function createStyles(palette, isDarkMode) {
             color: palette.textSecondary,
         },
 
-        clearFiltersTextHidden: {
-            opacity: 0,
+        filtersAccordionContent: {
+            paddingTop: 12,
+            gap: 13,
+        },
+
+        filterGroup: {
+            gap: 8,
+        },
+
+        filterGroupTitle: {
+            fontSize: 12,
+            fontWeight: "900",
+            color: palette.text,
+        },
+
+        filterChipsWrap: {
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 8,
         },
 
         filtersScrollContent: {
@@ -2750,7 +2987,7 @@ function createStyles(palette, isDarkMode) {
 
         monthWeekRowWrapper: {
             position: "relative",
-            overflow: "visible",
+            overflow: "hidden",
         },
 
         monthWeekRow: {
@@ -2816,6 +3053,88 @@ function createStyles(palette, isDarkMode) {
             lineHeight: 11,
         },
 
+        objectivePreviewPressed: {
+            opacity: 0.86,
+        },
+
+        monthObjectiveCard: {
+            borderWidth: 1,
+            borderRadius: 999,
+            minHeight: 18,
+            paddingHorizontal: 4,
+            paddingVertical: 1,
+            flexDirection: "row",
+            alignItems: "center",
+            overflow: "hidden",
+        },
+
+        weekObjectiveCard: {
+            borderWidth: 1,
+            borderRadius: 12,
+            minHeight: 38,
+            paddingHorizontal: 5,
+            paddingVertical: 4,
+            flexDirection: "row",
+            alignItems: "center",
+            overflow: "hidden",
+        },
+
+        objectivePreviewInitialsRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginRight: 4,
+        },
+
+        monthObjectiveInitial: {
+            width: 14,
+            height: 14,
+            borderRadius: 999,
+            backgroundColor: "rgba(255,255,255,0.24)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.65)",
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        monthObjectiveInitialText: {
+            fontSize: 7.5,
+            fontWeight: "900",
+            lineHeight: 9,
+        },
+
+        monthObjectiveTitle: {
+            flex: 1,
+            fontSize: 8.8,
+            fontWeight: "900",
+            color: "#FFFFFF",
+            lineHeight: 10,
+        },
+
+        weekObjectiveInitial: {
+            width: 18,
+            height: 18,
+            borderRadius: 999,
+            backgroundColor: "rgba(255,255,255,0.24)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.65)",
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        weekObjectiveInitialText: {
+            fontSize: 8.5,
+            fontWeight: "900",
+            lineHeight: 10,
+        },
+
+        weekObjectiveTitle: {
+            flex: 1,
+            fontSize: 9,
+            fontWeight: "900",
+            color: "#FFFFFF",
+            lineHeight: 11,
+        },
+
         weeklyObjectiveHiddenBadge: {
             position: "absolute",
             top: 72,
@@ -2842,7 +3161,7 @@ function createStyles(palette, isDarkMode) {
             borderWidth: 0.5,
             borderColor: palette.border,
             paddingHorizontal: 1,
-            paddingTop: 50,
+            paddingTop: 22,
             paddingBottom: 2,
             overflow: "hidden",
             backgroundColor: palette.card,
@@ -2921,7 +3240,7 @@ function createStyles(palette, isDarkMode) {
         monthTaskCard: {
             borderWidth: 1,
             borderRadius: 8,
-            minHeight: 29,
+            minHeight: 25,
             paddingHorizontal: 1,
             paddingVertical: 2,
             alignItems: "center",

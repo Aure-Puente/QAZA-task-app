@@ -1,5 +1,6 @@
 //Importaciones:
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useEffect, useMemo, useState } from "react";
 import {
     Alert,
@@ -39,6 +40,18 @@ function getDateFromRouteParam(value) {
     return Number.isNaN(date.getTime()) ? new Date() : date;
 }
 
+function normalizeStartDate(date) {
+    const safeDate = new Date(date);
+    safeDate.setHours(0, 0, 0, 0);
+    return safeDate;
+}
+
+function normalizeEndDate(date) {
+    const safeDate = new Date(date);
+    safeDate.setHours(23, 59, 59, 999);
+    return safeDate;
+}
+
 function toDateKey(date) {
     if (!date) return "";
 
@@ -50,28 +63,6 @@ function toDateKey(date) {
     return `${year}-${month}-${day}`;
 }
 
-function getWeekStart(date) {
-    const safeDate = new Date(date);
-    safeDate.setHours(0, 0, 0, 0);
-
-    const day = safeDate.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-
-    safeDate.setDate(safeDate.getDate() + diff);
-
-    return safeDate;
-}
-
-function getWeekEnd(date) {
-    const start = getWeekStart(date);
-    const end = new Date(start);
-
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-
-    return end;
-}
-
 function formatDateLabel(date) {
     if (!date) return "";
 
@@ -79,6 +70,7 @@ function formatDateLabel(date) {
         weekday: "short",
         day: "2-digit",
         month: "short",
+        year: "numeric",
     }).format(date);
 }
 
@@ -86,13 +78,7 @@ function formatRangeLabel(startDate, endDate) {
     if (!startDate || !endDate) return "Rango no seleccionado";
 
     const start = formatDateLabel(startDate);
-
-    const end = new Intl.DateTimeFormat("es-AR", {
-        weekday: "short",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-    }).format(endDate);
+    const end = formatDateLabel(endDate);
 
     return `${start} - ${end}`;
 }
@@ -156,14 +142,15 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
     );
 
     const initialDate = useMemo(
-        () => getDateFromRouteParam(route?.params?.selectedDate),
+        () => normalizeStartDate(getDateFromRouteParam(route?.params?.selectedDate)),
         [route?.params?.selectedDate]
     );
 
-    const [weekBaseDate, setWeekBaseDate] = useState(initialDate);
+    const [startDate, setStartDate] = useState(initialDate);
+    const [endDate, setEndDate] = useState(normalizeEndDate(initialDate));
 
-    const startDate = useMemo(() => getWeekStart(weekBaseDate), [weekBaseDate]);
-    const endDate = useMemo(() => getWeekEnd(weekBaseDate), [weekBaseDate]);
+    const [datePickerVisible, setDatePickerVisible] = useState(false);
+    const [activeDatePicker, setActiveDatePicker] = useState(null);
 
     const [title, setTitle] = useState("");
     const [saving, setSaving] = useState(false);
@@ -179,7 +166,7 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
 
     const [successVisible, setSuccessVisible] = useState(false);
 
-    const selectedCategory = getNoteCategoryByKey(categoryKey);
+    const selectedCategory = getNoteCategoryByKey(categoryKey, isDarkMode);
 
     useEffect(() => {
         if (user?.uid) {
@@ -224,10 +211,10 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
 
         const selfUser = user?.uid
             ? {
-                  uid: String(user.uid),
-                  name: user?.name || "Yo",
-                  email: user?.email || "",
-              }
+                uid: String(user.uid),
+                name: user?.name || "Yo",
+                email: user?.email || "",
+                }
             : null;
 
         const merged = selfUser
@@ -252,20 +239,51 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
         return `${selectedUsers.length} responsables seleccionados`;
     }, [selectedUsers, usersLoading]);
 
-    const handlePreviousWeek = () => {
-        setWeekBaseDate((prev) => {
-            const next = new Date(prev);
-            next.setDate(prev.getDate() - 7);
-            return next;
-        });
+    const openDatePicker = (type) => {
+        setActiveDatePicker(type);
+        setDatePickerVisible(true);
     };
 
-    const handleNextWeek = () => {
-        setWeekBaseDate((prev) => {
-            const next = new Date(prev);
-            next.setDate(prev.getDate() + 7);
-            return next;
-        });
+    const closeDatePicker = () => {
+        setDatePickerVisible(false);
+        setActiveDatePicker(null);
+    };
+
+    const handleDatePickerChange = (event, selectedDate) => {
+        if (Platform.OS === "android") {
+            setDatePickerVisible(false);
+        }
+
+        if (event?.type === "dismissed") {
+            closeDatePicker();
+            return;
+        }
+
+        if (!selectedDate || !activeDatePicker) return;
+
+        if (activeDatePicker === "start") {
+            const normalizedStart = normalizeStartDate(selectedDate);
+
+            setStartDate(normalizedStart);
+
+            if (normalizedStart.getTime() > endDate.getTime()) {
+                setEndDate(normalizeEndDate(normalizedStart));
+            }
+        }
+
+        if (activeDatePicker === "end") {
+            const normalizedEnd = normalizeEndDate(selectedDate);
+
+            setEndDate(normalizedEnd);
+
+            if (normalizedEnd.getTime() < startDate.getTime()) {
+                setStartDate(normalizeStartDate(normalizedEnd));
+            }
+        }
+
+        if (Platform.OS === "android") {
+            setActiveDatePicker(null);
+        }
     };
 
     const handleToggleUser = (selectedUser) => {
@@ -312,6 +330,17 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
             return;
         }
 
+        const safeStartDate = normalizeStartDate(startDate);
+        const safeEndDate = normalizeEndDate(endDate);
+
+        if (safeEndDate.getTime() < safeStartDate.getTime()) {
+            Alert.alert(
+                "Atención",
+                "La fecha final no puede ser anterior a la fecha de inicio."
+            );
+            return;
+        }
+
         try {
             setSaving(true);
 
@@ -323,10 +352,10 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
                 categoryKey,
                 categoryLabel: selectedCategory.label,
 
-                startDate: toDateKey(startDate),
-                endDate: toDateKey(endDate),
-                startDateTimestamp: startDate.getTime(),
-                endDateTimestamp: endDate.getTime(),
+                startDate: toDateKey(safeStartDate),
+                endDate: toDateKey(safeEndDate),
+                startDateTimestamp: safeStartDate.getTime(),
+                endDateTimestamp: safeEndDate.getTime(),
 
                 createdBy: user?.uid ? String(user.uid) : "",
                 createdByName: user?.name || user?.email || "Usuario",
@@ -343,16 +372,18 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
 
             setTitle("");
             setCategoryKey(NOTE_CATEGORIES[0].key);
+            setStartDate(initialDate);
+            setEndDate(normalizeEndDate(initialDate));
 
             setSelectedUsers(
                 user?.uid
                     ? [
-                          {
-                              uid: String(user.uid),
-                              name: user?.name || "Yo",
-                              email: user?.email || "",
-                          },
-                      ]
+                        {
+                        uid: String(user.uid),
+                        name: user?.name || "Yo",
+                        email: user?.email || "",
+                        },
+                    ]
                     : []
             );
 
@@ -369,6 +400,9 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
         setSuccessVisible(false);
         navigation.goBack();
     };
+
+    const currentPickerValue =
+        activeDatePicker === "end" ? endDate : startDate;
 
     return (
         <>
@@ -398,11 +432,11 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
                     >
                         <View style={styles.headerBlock}>
                             <Text variant="headlineMedium" style={styles.title}>
-                                Nuevo objetivo semanal
+                                Nuevo objetivo
                             </Text>
 
                             <Text variant="bodyMedium" style={styles.subtitle}>
-                                Creá un objetivo para una semana, asignale responsables y categoría.
+                                Creá un objetivo, elegí el rango de fechas, asignale responsables y categoría.
                             </Text>
                         </View>
 
@@ -416,7 +450,7 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
                             </View>
 
                             <View style={styles.rangeTextWrap}>
-                                <Text style={styles.rangeLabel}>Rango semanal</Text>
+                                <Text style={styles.rangeLabel}>Rango seleccionado</Text>
 
                                 <Text style={styles.rangeValue}>
                                     {formatRangeLabel(startDate, endDate)}
@@ -424,41 +458,57 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
                             </View>
                         </View>
 
-                        <View style={styles.weekControlsRow}>
+                        <View style={styles.dateSelectorsRow}>
                             <Pressable
-                                onPress={handlePreviousWeek}
+                                onPress={() => openDatePicker("start")}
                                 style={({ pressed }) => [
-                                    styles.weekControlButton,
+                                    styles.dateSelectorButton,
                                     pressed && styles.pressed,
                                 ]}
                             >
-                                <MaterialCommunityIcons
-                                    name="chevron-left"
-                                    size={20}
-                                    color={palette.primary}
-                                />
+                                <View style={styles.dateSelectorIcon}>
+                                    <MaterialCommunityIcons
+                                        name="calendar-start-outline"
+                                        size={18}
+                                        color={palette.primary}
+                                    />
+                                </View>
 
-                                <Text style={styles.weekControlText}>
-                                    Semana anterior
-                                </Text>
+                                <View style={styles.dateSelectorTextWrap}>
+                                    <Text style={styles.dateSelectorLabel}>
+                                        Inicio
+                                    </Text>
+
+                                    <Text style={styles.dateSelectorValue}>
+                                        {formatDateLabel(startDate)}
+                                    </Text>
+                                </View>
                             </Pressable>
 
                             <Pressable
-                                onPress={handleNextWeek}
+                                onPress={() => openDatePicker("end")}
                                 style={({ pressed }) => [
-                                    styles.weekControlButton,
+                                    styles.dateSelectorButton,
                                     pressed && styles.pressed,
                                 ]}
                             >
-                                <Text style={styles.weekControlText}>
-                                    Semana siguiente
-                                </Text>
+                                <View style={styles.dateSelectorIcon}>
+                                    <MaterialCommunityIcons
+                                        name="calendar-end-outline"
+                                        size={18}
+                                        color={palette.primary}
+                                    />
+                                </View>
 
-                                <MaterialCommunityIcons
-                                    name="chevron-right"
-                                    size={20}
-                                    color={palette.primary}
-                                />
+                                <View style={styles.dateSelectorTextWrap}>
+                                    <Text style={styles.dateSelectorLabel}>
+                                        Final
+                                    </Text>
+
+                                    <Text style={styles.dateSelectorValue}>
+                                        {formatDateLabel(endDate)}
+                                    </Text>
+                                </View>
                             </Pressable>
                         </View>
 
@@ -657,7 +707,7 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
                                     />
 
                                     <Text style={styles.infoText}>
-                                        El objetivo se mostrará como una barra horizontal dentro del calendario, ocupando los días de la semana seleccionada.
+                                        El objetivo se mostrará como una barra horizontal dentro del calendario, ocupando desde la fecha de inicio hasta la fecha final.
                                     </Text>
                                 </View>
 
@@ -691,6 +741,15 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
                 </KeyboardAvoidingView>
             </View>
 
+            {datePickerVisible ? (
+                <DateTimePicker
+                    value={currentPickerValue}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    onChange={handleDatePickerChange}
+                />
+            ) : null}
+
             <Portal>
                 <Dialog
                     visible={categoryDialogVisible}
@@ -708,6 +767,7 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
                             showsVerticalScrollIndicator={false}
                         >
                             {NOTE_CATEGORIES.map((item) => {
+                                const category = getNoteCategoryByKey(item.key, isDarkMode);
                                 const isSelected = item.key === categoryKey;
 
                                 return (
@@ -718,12 +778,12 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
                                             styles.optionItem,
                                             {
                                                 backgroundColor: isSelected
-                                                    ? item.soft
-                                                    : isDarkMode
-                                                      ? "rgba(255,255,255,0.025)"
-                                                      : "#FFFFFF",
+                                                    ? category.soft
+                                                : isDarkMode
+                                                    ? "rgba(255,255,255,0.025)"
+                                                    : "#FFFFFF",
                                                 borderColor: isSelected
-                                                    ? item.border
+                                                    ? category.border
                                                     : palette.border,
                                             },
                                             pressed && styles.optionItemPressed,
@@ -733,32 +793,32 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
                                             style={[
                                                 styles.optionAvatar,
                                                 {
-                                                    backgroundColor: item.soft,
-                                                    borderColor: item.border,
+                                                    backgroundColor: category.soft,
+                                                    borderColor: category.border,
                                                 },
                                             ]}
                                         >
                                             <MaterialCommunityIcons
-                                                name={item.icon}
+                                                name={category.icon}
                                                 size={18}
-                                                color={item.color}
+                                                color={category.color}
                                             />
                                         </View>
 
                                         <Text
                                             style={[
                                                 styles.optionName,
-                                                isSelected && { color: item.color },
+                                                isSelected && { color: category.color },
                                             ]}
                                         >
-                                            {item.label}
+                                            {category.label}
                                         </Text>
 
                                         {isSelected ? (
                                             <MaterialCommunityIcons
                                                 name="check-circle"
                                                 size={20}
-                                                color={item.color}
+                                                color={category.color}
                                             />
                                         ) : null}
                                     </Pressable>
@@ -817,8 +877,8 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
                                                     {String(item.uid) === String(user?.uid)
                                                         ? `${item.name || "Yo"} (Yo)`
                                                         : item.name ||
-                                                          item.email ||
-                                                          "Usuario"}
+                                                        item.email ||
+                                                        "Usuario"}
                                                 </Text>
 
                                                 {!!item.email ? (
@@ -886,7 +946,7 @@ export default function CreateWeeklyObjectiveScreen({ navigation, route }) {
                         </Text>
 
                         <Text variant="bodyMedium" style={styles.successText}>
-                            El objetivo semanal se guardó correctamente.
+                            El objetivo se guardó correctamente.
                         </Text>
 
                         <Button
@@ -1018,32 +1078,60 @@ function createStyles(palette, isDarkMode) {
             lineHeight: 20,
         },
 
-        weekControlsRow: {
+        dateSelectorsRow: {
             flexDirection: "row",
             gap: 10,
             marginBottom: 16,
         },
 
-        weekControlButton: {
+        dateSelectorButton: {
             flex: 1,
-            minHeight: 42,
-            borderRadius: 15,
+            minHeight: 68,
+            borderRadius: 18,
             borderWidth: 1,
             borderColor: palette.border,
             backgroundColor: isDarkMode
                 ? "rgba(255,255,255,0.035)"
                 : "#FAF8F5",
+            paddingHorizontal: 10,
+            paddingVertical: 10,
             flexDirection: "row",
             alignItems: "center",
-            justifyContent: "center",
-            gap: 5,
-            paddingHorizontal: 8,
+            gap: 9,
         },
 
-        weekControlText: {
-            fontSize: 12,
+        dateSelectorIcon: {
+            width: 36,
+            height: 36,
+            borderRadius: 13,
+            backgroundColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.11)"
+                : "rgba(209, 107, 24, 0.08)",
+            borderWidth: 1,
+            borderColor: isDarkMode
+                ? "rgba(240, 138, 43, 0.22)"
+                : "rgba(209, 107, 24, 0.18)",
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        dateSelectorTextWrap: {
+            flex: 1,
+        },
+
+        dateSelectorLabel: {
+            fontSize: 11.5,
+            color: palette.textSecondary,
             fontWeight: "800",
-            color: palette.primary,
+            marginBottom: 3,
+        },
+
+        dateSelectorValue: {
+            fontSize: 12.5,
+            fontWeight: "900",
+            color: palette.text,
+            textTransform: "capitalize",
+            lineHeight: 17,
         },
 
         card: {
